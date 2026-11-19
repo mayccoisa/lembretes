@@ -1,0 +1,229 @@
+@import "tailwindcss";
+
+/*
+ * BoardUI · Tokens semanticos re-tintados para o Lembretes.
+ * Unico arquivo autorizado a conter valores de cor literais (regra T-21).
+ * Claro em :root e escuro em .dark; componentes leem apenas variaveis semanticas.
+ */
+
+:root {
+  /* Rampa de accent BoardUI (11 passos · Carmim Fita Quente) */
+  --color-accent-50: #fff1f2;
+  --color-accent-100: #ffe1e4;
+  --color-accent-200: #ffc8ce;
+  --color-accent-300: #fda1ac;
+  --color-accent-400: #f96b7d;
+  --color-accent-500: #ef3e56;
+  --color-accent-600: #dc2440;
+  --color-accent-700: #b91933;
+  --color-accent-800: #9a182f;
+  --color-accent-900: #83182d;
+  --color-accent-950: #490814;
+
+  /* Superficies e fundos */
+  --bg-canvas: #fbf8f4;
+  --bg-panel: #ffffff;
+  --bg-elevated: #ffffff;
+  --bg-subtle: #f4efe8;
+  --bg-hover: #ede6dc;
+  --bg-overlay: rgba(28, 22, 18, 0.44);
+
+  /* Bordas e aneis */
+  --border-subtle: #e7dfd4;
+  --border-strong: #d3c7b7;
+  --ring-focus: rgba(220, 36, 64, 0.32);
+
+  /* Tipografia semantica */
+  --text-primary: #211c18;
+  --text-secondary: #5c5248;
+  --text-muted: #8a7e72;
+  --text-on-accent: #ffffff;
+
+  /* Estados semanticos */
+  --brand-primary: var(--color-accent-600);
+  --brand-hover: var(--color-accent-700);
+  --brand-soft: var(--color-accent-100);
+  --state-danger: #c92a2a;
+  --state-danger-soft: #ffe3e3;
+  --state-warning-bg: #fff3bf;
+  --state-warning-text: #8a5300;
+
+  /* Sombras BoardUI */
+  --shadow-card: 0 2px 8px rgba(33, 28, 24, 0.06), 0 1px 2px rgba(33, 28, 24, 0.05);
+  --shadow-elevated: 0 14px 34px rgba(33, 28, 24, 0.14), 0 3px 10px rgba(33, 28, 24, 0.08);
+  --shadow-widget: 0 10px 24px rgba(33, 28, 24, 0.22);
+
+  /* Arte do dedo indicador */
+  --dedo-pele: #f7c7a3;
+  --dedo-sombra: #e6ac83;
+  --dedo-unha: #ffe6d6;
+  --dedo-contorno: #6c4632;
+
+  /* 6 Cores semanticas das fitas dos lacos (claro) */
+  --fita-carmim-bg: #fff7f7;
+  --fita-carmim-borda: #f8cfd4;
+  --fita-carmim-viva: #e0314b;
+  --fita-carmim-no: #b41d35;
+
+  --fita-ambar-bg: #fffaf0;
+  --fita-ambar-borda: #f5dfad;
+  --fita-ambar-viva: #e68a00;
+  --fita-ambar-no: #b86800;
+
+  --fita-salvia-bg: #f4fbf6;
+  --fita-salvia-borda: #c5e7cf;
+  --fita-salvia-viva: #2b9358;
+  --fita-salvia-no: #1d6b3f;
+
+  --fita-ceu-bg: #f3f9ff;
+  --fita-ceu-borda: #c4dff8;
+  --fita-ceu-viva: #1f7ae0;
+  --fita-ceu-no: #1557a6;
+
+  --fita-lavanda-bg: #f9f5ff;
+  --fita-lavanda-borda: #decdf7;
+  --fita-lavanda-viva: #7c4dff;
+  --fita-lavanda-no: #5930cc;
+
+  --fita-pessego-bg: #fff6f1;
+  --fita-pessego-borda: #f8d4bf;
+  --fita-pessego-viva: #ea5b2b;
+  --fita-pessego-no: #ba3f16;
+}
+
+.dark {
+  --bg-canvas: #161311;
+  --bg-panel: #201c19;
+  --bg-elevated: #28231f;
+  --bg-subtle: #2b2521;
+  --bg-hover: #362f2a;
+  --bg-overlay: rgba(8, 6, 5, 0.68);
+
+  --border-subtle: #38302b;
+  --border-strong: #4e433c;
+  --ring-focus: rgba(249, 107, 125, 0.4);
+
+  --text-primary: #f6f1eb;
+  --text-secondary: #c5b9ad;
+  --text-muted: #8f8276;
+  --text-on-accent: #ffffff;
+
+  --brand-primary: var(--color-accent-500);
+  --brand-hover: var(--color-accent-400);
+  --brand-soft: rgba(239, 62, 86, 0.18);
+  --state-danger: #ff6b6b;
+  --state-danger-soft: rgba(255, 107, 107, 0.16);
+  --state-warning-bg: rgba(230, 138, 0, 0.2);
+  --state-warning-text: #ffd480;
+
+  --shadow-card: 0 2px 10px rgba(0, 0, 0, 0.34);
+  --shadow-elevated: 0 16px 38px rgba(0, 0, 0, 0.56);
+  --shadow-widget: 0 10px 26px rgba(0, 0, 0, 0.55);
+
+  --dedo-pele: #eeb892;
+  --dedo-sombra: #d4986f;
+  --dedo-unha: #fadbc7;
+  --dedo-contorno: #4d2f20;
+
+  /* 6 Cores semanticas das fitas dos lacos (escuro) */
+  --fita-carmim-bg: #291c1e;
+  --fita-carmim-borda: #542d34;
+  --fita-carmim-viva: #ff5c74;
+  --fita-carmim-no: #d93852;
+
+  --fita-ambar-bg: #292217;
+  --fita-ambar-borda: #544222;
+  --fita-ambar-viva: #ffae33;
+  --fita-ambar-no: #d9880f;
+
+  --fita-salvia-bg: #19261e;
+  --fita-salvia-borda: #2b4d38;
+  --fita-salvia-viva: #46c27b;
+  --fita-salvia-no: #2c9659;
+
+  --fita-ceu-bg: #18222c;
+  --fita-ceu-borda: #2a4562;
+  --fita-ceu-viva: #54a4ff;
+  --fita-ceu-no: #2f7bd6;
+
+  --fita-lavanda-bg: #221c2c;
+  --fita-lavanda-borda: #433260;
+  --fita-lavanda-viva: #a480ff;
+  --fita-lavanda-no: #7d56e0;
+
+  --fita-pessego-bg: #2a1e19;
+  --fita-pessego-borda: #573729;
+  --fita-pessego-viva: #ff7e52;
+  --fita-pessego-no: #d9572b;
+}
+
+@theme inline {
+  --color-canvas: var(--bg-canvas);
+  --color-panel: var(--bg-panel);
+  --color-elevated: var(--bg-elevated);
+  --color-subtle: var(--bg-subtle);
+  --color-hover: var(--bg-hover);
+  --color-overlay: var(--bg-overlay);
+  --color-border-subtle: var(--border-subtle);
+  --color-border-strong: var(--border-strong);
+  --color-ink: var(--text-primary);
+  --color-ink-secondary: var(--text-secondary);
+  --color-ink-muted: var(--text-muted);
+  --color-ink-on-accent: var(--text-on-accent);
+  --color-brand: var(--brand-primary);
+  --color-brand-hover: var(--brand-hover);
+  --color-brand-soft: var(--brand-soft);
+  --color-danger: var(--state-danger);
+  --color-danger-soft: var(--state-danger-soft);
+  --color-warning-bg: var(--state-warning-bg);
+  --color-warning-ink: var(--state-warning-text);
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  background-color: var(--bg-canvas);
+  color: var(--text-primary);
+  font-family: "Inter", "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Janela flutuante transparente do dedo no Windows */
+html.janela-widget,
+html.janela-widget body {
+  background: transparent !important;
+  overflow: hidden;
+  user-select: none;
+}
+
+@keyframes balanco-fita {
+  0%,
+  100% {
+    transform: rotate(-2.5deg);
+  }
+  50% {
+    transform: rotate(3deg);
+  }
+}
+
+@keyframes pulso-lembrete {
+  0%,
+  100% {
+    transform: scale(1);
+    opacity: 0.92;
+  }
+  50% {
+    transform: scale(1.1);
+    opacity: 1;
+  }
+}
+
+.animar-balanco-fita {
+  transform-origin: 50% 52%;
+  animation: balanco-fita 3.4s ease-in-out infinite;
+}
+
+.animar-pulso-lembrete {
+  animation: pulso-lembrete 1.6s ease-in-out infinite;
+}

@@ -1,0 +1,42 @@
+{
+  "name": "lembretes",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Lembretes: mural visual rápido e dedo com lacinho flutuante no Windows",
+  "scripts": {
+    "dev": "vite --port 1420 --strictPort",
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview --port 1420 --strictPort",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "check:fronteiras": "node scripts/check-fronteiras.mjs",
+    "check:traco": "node scripts/check-traco.mjs",
+    "check:visual": "node scripts/check-visual.mjs",
+    "medir:boot": "node scripts/medir-boot.mjs",
+    "check": "npm run typecheck && npm run test && npm run check:fronteiras && npm run check:traco && npm run check:visual && npm run build && npm run medir:boot",
+    "tauri:dev": "tauri dev",
+    "tauri:build": "tauri build"
+  },
+  "dependencies": {
+    "@tauri-apps/api": "^2.2.0",
+    "@tauri-apps/plugin-global-shortcut": "^2.2.0",
+    "@tauri-apps/plugin-notification": "^2.2.0",
+    "lucide-react": "^0.475.0",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0"
+  },
+  "devDependencies": {
+    "@tailwindcss/vite": "^4.0.9",
+    "@tauri-apps/cli": "^2.2.0",
+    "@types/node": "^22.13.0",
+    "@types/react": "^19.0.10",
+    "@types/react-dom": "^19.0.4",
+    "@vitejs/plugin-react": "^4.3.4",
+    "jsdom": "^26.0.0",
+    "tailwindcss": "^4.0.9",
+    "typescript": "^5.7.3",
+    "vite": "^6.2.0",
+    "vitest": "^3.0.7"
+  }
+}

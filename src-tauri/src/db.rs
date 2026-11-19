@@ -1,0 +1,383 @@
+use chrono::Utc;
+use rusqlite::{params, Connection};
+use serde::{Deserialize, Deserializer, Serialize};
+use std::path::Path;
+use uuid::Uuid;
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ItemChecklist {
+    pub id: String,
+    pub texto: String,
+    pub concluido: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Laco {
+    pub id: String,
+    pub titulo: String,
+    pub modo: String,
+    pub texto: String,
+    pub itens: Vec<ItemChecklist>,
+    pub cor_fita: String,
+    pub imagem_url: Option<String>,
+    pub imagem_nome: Option<String>,
+    pub fixado: bool,
+    pub lembrar_em: Option<String>,
+    pub notificado_em: Option<String>,
+    pub estado: String,
+    pub desfeito_em: Option<String>,
+    pub created_at: String,
+    pub updated_at: String,
+    pub deleted_at: Option<String>,
+    pub sync_version: i64,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct NovoLacoInput {
+    pub titulo: Option<String>,
+    pub modo: Option<String>,
+    pub texto: Option<String>,
+    pub itens: Option<Vec<ItemChecklist>>,
+    pub cor_fita: Option<String>,
+    pub imagem_url: Option<String>,
+    pub imagem_nome: Option<String>,
+    pub fixado: Option<bool>,
+    pub lembrar_em: Option<String>,
+}
+
+fn deserializar_anulavel<'de, D>(deserializer: D) -> Result<Option<Option<String>>, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    Ok(Some(Option::<String>::deserialize(deserializer)?))
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AtualizarLacoInput {
+    pub id: String,
+    pub titulo: Option<String>,
+    pub modo: Option<String>,
+    pub texto: Option<String>,
+    pub itens: Option<Vec<ItemChecklist>>,
+    pub cor_fita: Option<String>,
+    #[serde(default, deserialize_with = "deserializar_anulavel")]
+    pub imagem_url: Option<Option<String>>,
+    #[serde(default, deserialize_with = "deserializar_anulavel")]
+    pub imagem_nome: Option<Option<String>>,
+    pub fixado: Option<bool>,
+    #[serde(default, deserialize_with = "deserializar_anulavel")]
+    pub lembrar_em: Option<Option<String>>,
+    #[serde(default, deserialize_with = "deserializar_anulavel")]
+    pub notificado_em: Option<Option<String>>,
+}
+
+pub fn abrir_banco(caminho: &Path) -> Result<Connection, String> {
+    let conn = Connection::open(caminho).map_err(|e| format!("Falha ao abrir SQLite: {e}"))?;
+    migrar(&conn)?;
+    Ok(conn)
+}
+
+fn migrar(conn: &Connection) -> Result<(), String> {
+    let versao: i64 = conn
+        .query_row("PRAGMA user_version", [], |row| row.get(0))
+        .map_err(|e| e.to_string())?;
+
+    if versao < 1 {
+        conn.execute_batch(
+            "CREATE TABLE IF NOT EXISTS lacos (
+                id TEXT PRIMARY KEY NOT NULL,
+                titulo TEXT NOT NULL DEFAULT '',
+                modo TEXT NOT NULL DEFAULT 'texto',
+                texto TEXT NOT NULL DEFAULT '',
+                itens_json TEXT NOT NULL DEFAULT '[]',
+                cor_fita TEXT NOT NULL DEFAULT 'carmim',
+                imagem_url TEXT,
+                imagem_nome TEXT,
+                fixado INTEGER NOT NULL DEFAULT 0,
+                lembrar_em TEXT,
+                notificado_em TEXT,
+                estado TEXT NOT NULL DEFAULT 'ativo',
+                desfeito_em TEXT,
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL,
+                deleted_at TEXT,
+                sync_version INTEGER NOT NULL DEFAULT 1
+            );
+            CREATE INDEX IF NOT EXISTS idx_lacos_estado ON lacos(estado, deleted_at);
+            PRAGMA user_version = 1;",
+        )
+        .map_err(|e| format!("Falha na migracao 001: {e}"))?;
+    }
+    Ok(())
+}
+
+fn ler_laco_por_id(conn: &Connection, id: &str) -> Result<Laco, String> {
+    conn.query_row(
+        "SELECT
+            id, titulo, modo, texto, itens_json, cor_fita,
+            imagem_url, imagem_nome, fixado, lembrar_em, notificado_em,
+            estado, desfeito_em, created_at, updated_at, deleted_at, sync_version
+         FROM lacos
+         WHERE id = ?1 AND deleted_at IS NULL",
+        params![id],
+        mapear_linha,
+    )
+    .map_err(|e| format!("Laco nao encontrado ({id}): {e}"))
+}
+
+fn mapear_linha(row: &rusqlite::Row<'_>) -> rusqlite::Result<Laco> {
+    let itens_json: String = row.get(4)?;
+    let itens: Vec<ItemChecklist> = serde_json::from_str(&itens_json).unwrap_or_default();
+    let fixado_int: i64 = row.get(8)?;
+    Ok(Laco {
+        id: row.get(0)?,
+        titulo: row.get(1)?,
+        modo: row.get(2)?,
+        texto: row.get(3)?,
+        itens,
+        cor_fita: row.get(5)?,
+        imagem_url: row.get(6)?,
+        imagem_nome: row.get(7)?,
+        fixado: fixado_int != 0,
+        lembrar_em: row.get(9)?,
+        notificado_em: row.get(10)?,
+        estado: row.get(11)?,
+        desfeito_em: row.get(12)?,
+        created_at: row.get(13)?,
+        updated_at: row.get(14)?,
+        deleted_at: row.get(15)?,
+        sync_version: row.get(16)?,
+    })
+}
+
+pub fn listar_lacos(conn: &Connection) -> Result<Vec<Laco>, String> {
+    let mut stmt = conn
+        .prepare(
+            "SELECT
+                id, titulo, modo, texto, itens_json, cor_fita,
+                imagem_url, imagem_nome, fixado, lembrar_em, notificado_em,
+                estado, desfeito_em, created_at, updated_at, deleted_at, sync_version
+             FROM lacos
+             WHERE deleted_at IS NULL
+             ORDER BY fixado DESC, updated_at DESC",
+        )
+        .map_err(|e| e.to_string())?;
+
+    let iter = stmt
+        .query_map([], mapear_linha)
+        .map_err(|e| e.to_string())?;
+
+    let mut saida = Vec::new();
+    for item in iter {
+        saida.push(item.map_err(|e| e.to_string())?);
+    }
+    Ok(saida)
+}
+
+pub fn criar_laco(conn: &Connection, input: NovoLacoInput) -> Result<Laco, String> {
+    let id = Uuid::new_v4().to_string();
+    let agora = Utc::now().to_rfc3339();
+    let titulo = input.titulo.unwrap_or_default().trim().to_string();
+    let modo = input.modo.unwrap_or_else(|| "texto".to_string());
+    let texto = input.texto.unwrap_or_default();
+    let itens_filtrados: Vec<ItemChecklist> = input
+        .itens
+        .unwrap_or_default()
+        .into_iter()
+        .filter(|i| !i.texto.trim().is_empty())
+        .collect();
+    let itens_json = serde_json::to_string(&itens_filtrados).map_err(|e| e.to_string())?;
+    let cor_fita = input.cor_fita.unwrap_or_else(|| "carmim".to_string());
+    let fixado_int: i64 = if input.fixado.unwrap_or(false) { 1 } else { 0 };
+
+    conn.execute(
+        "INSERT INTO lacos (
+            id, titulo, modo, texto, itens_json, cor_fita,
+            imagem_url, imagem_nome, fixado, lembrar_em, notificado_em,
+            estado, desfeito_em, created_at, updated_at, deleted_at, sync_version
+        ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, NULL, 'ativo', NULL, ?11, ?11, NULL, 1)",
+        params![
+            id,
+            titulo,
+            modo,
+            texto,
+            itens_json,
+            cor_fita,
+            input.imagem_url,
+            input.imagem_nome,
+            fixado_int,
+            input.lembrar_em,
+            agora
+        ],
+    )
+    .map_err(|e| format!("Falha ao inserir laco: {e}"))?;
+
+    ler_laco_por_id(conn, &id)
+}
+
+pub fn atualizar_laco(conn: &Connection, input: AtualizarLacoInput) -> Result<Laco, String> {
+    let atual = ler_laco_por_id(conn, &input.id)?;
+    let agora = Utc::now().to_rfc3339();
+
+    let titulo = input
+        .titulo
+        .map(|t| t.trim().to_string())
+        .unwrap_or(atual.titulo);
+    let modo = input.modo.unwrap_or(atual.modo);
+    let texto = input.texto.unwrap_or(atual.texto);
+    let itens = input.itens.unwrap_or(atual.itens);
+    let itens_json = serde_json::to_string(&itens).map_err(|e| e.to_string())?;
+    let cor_fita = input.cor_fita.unwrap_or(atual.cor_fita);
+    let imagem_url = match input.imagem_url {
+        Some(v) => v,
+        None => atual.imagem_url,
+    };
+    let imagem_nome = match input.imagem_nome {
+        Some(v) => v,
+        None => atual.imagem_nome,
+    };
+    let fixado_int: i64 = if input.fixado.unwrap_or(atual.fixado) {
+        1
+    } else {
+        0
+    };
+
+    let mudou_lembrete = matches!(&input.lembrar_em, Some(novo) if *novo != atual.lembrar_em);
+    let lembrar_em = match input.lembrar_em {
+        Some(v) => v,
+        None => atual.lembrar_em,
+    };
+    let notificado_em = if mudou_lembrete {
+        None
+    } else {
+        match input.notificado_em {
+            Some(v) => v,
+            None => atual.notificado_em,
+        }
+    };
+
+    conn.execute(
+        "UPDATE lacos SET
+            titulo = ?1,
+            modo = ?2,
+            texto = ?3,
+            itens_json = ?4,
+            cor_fita = ?5,
+            imagem_url = ?6,
+            imagem_nome = ?7,
+            fixado = ?8,
+            lembrar_em = ?9,
+            notificado_em = ?10,
+            updated_at = ?11,
+            sync_version = sync_version + 1
+         WHERE id = ?12 AND deleted_at IS NULL",
+        params![
+            titulo,
+            modo,
+            texto,
+            itens_json,
+            cor_fita,
+            imagem_url,
+            imagem_nome,
+            fixado_int,
+            lembrar_em,
+            notificado_em,
+            agora,
+            input.id
+        ],
+    )
+    .map_err(|e| format!("Falha ao atualizar laco: {e}"))?;
+
+    ler_laco_por_id(conn, &input.id)
+}
+
+pub fn desfazer_laco(conn: &Connection, id: &str) -> Result<Laco, String> {
+    let agora = Utc::now().to_rfc3339();
+    conn.execute(
+        "UPDATE lacos SET
+            estado = 'desfeito',
+            desfeito_em = ?1,
+            updated_at = ?1,
+            sync_version = sync_version + 1
+         WHERE id = ?2 AND deleted_at IS NULL",
+        params![agora, id],
+    )
+    .map_err(|e| format!("Falha ao desfazer laco: {e}"))?;
+    ler_laco_por_id(conn, id)
+}
+
+pub fn reamarrar_laco(conn: &Connection, id: &str) -> Result<Laco, String> {
+    let agora = Utc::now().to_rfc3339();
+    conn.execute(
+        "UPDATE lacos SET
+            estado = 'ativo',
+            desfeito_em = NULL,
+            updated_at = ?1,
+            sync_version = sync_version + 1
+         WHERE id = ?2 AND deleted_at IS NULL",
+        params![agora, id],
+    )
+    .map_err(|e| format!("Falha ao reamarrar laco: {e}"))?;
+    ler_laco_por_id(conn, id)
+}
+
+pub fn excluir_laco(conn: &Connection, id: &str) -> Result<(), String> {
+    let agora = Utc::now().to_rfc3339();
+    conn.execute(
+        "UPDATE lacos SET
+            deleted_at = ?1,
+            updated_at = ?1,
+            sync_version = sync_version + 1
+         WHERE id = ?2",
+        params![agora, id],
+    )
+    .map_err(|e| format!("Falha ao excluir laco: {e}"))?;
+    Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn ciclo_completo_sqlite_em_memoria() {
+        let conn = Connection::open_in_memory().expect("abrir banco em memoria");
+        migrar(&conn).expect("migrar schema");
+
+        let criado = criar_laco(
+            &conn,
+            NovoLacoInput {
+                titulo: Some("Comprar presente".to_string()),
+                modo: Some("texto".to_string()),
+                texto: Some("Passar na papelaria".to_string()),
+                itens: None,
+                cor_fita: Some("carmim".to_string()),
+                imagem_url: None,
+                imagem_nome: None,
+                fixado: Some(true),
+                lembrar_em: None,
+            },
+        )
+        .expect("criar laco");
+
+        assert_eq!(criado.estado, "ativo");
+        assert!(criado.fixado);
+
+        let desfeito = desfazer_laco(&conn, &criado.id).expect("desfazer");
+        assert_eq!(desfeito.estado, "desfeito");
+        assert!(desfeito.desfeito_em.is_some());
+        assert_eq!(desfeito.sync_version, 2);
+
+        let reamarrado = reamarrar_laco(&conn, &criado.id).expect("reamarrar");
+        assert_eq!(reamarrado.estado, "ativo");
+        assert!(reamarrado.desfeito_em.is_none());
+
+        excluir_laco(&conn, &criado.id).expect("excluir");
+        let restantes = listar_lacos(&conn).expect("listar");
+        assert_eq!(restantes.len(), 0);
+    }
+}
