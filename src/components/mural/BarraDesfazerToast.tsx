@@ -1,5 +1,5 @@
-import { RotateCcw, X } from 'lucide-react';
-import type { Laco } from '../../contracts/laco';
+import { Repeat, RotateCcw, X } from 'lucide-react';
+import { lacoEstaOcultoAteProximoCiclo, type Laco } from '../../contracts/laco';
 import { Botao } from '../ui/Botao';
 
 interface BarraDesfazerToastProps {
@@ -13,6 +13,8 @@ export function BarraDesfazerToast({
   aoReamarrar,
   aoDispensar,
 }: BarraDesfazerToastProps) {
+  const ehRecorrenteAgendado = lacoEstaOcultoAteProximoCiclo(laco);
+
   return (
     <div
       role="status"
@@ -24,11 +26,24 @@ export function BarraDesfazerToast({
         className="h-2.5 w-2.5 rounded-full shrink-0"
       />
       <span className="text-xs font-medium text-ink">
-        Laço desfeito: <strong>{laco.titulo || 'Lembrança concluída'}</strong>
+        {ehRecorrenteAgendado ? (
+          <>
+            Concluído hoje! Reagendado para o próximo ciclo:{' '}
+            <strong>{laco.titulo || 'Lembrança recorrente'}</strong>
+          </>
+        ) : (
+          <>
+            Laço desfeito: <strong>{laco.titulo || 'Lembrança concluída'}</strong>
+          </>
+        )}
       </span>
       <Botao variante="primario" onClick={aoReamarrar}>
-        <RotateCcw className="h-3.5 w-3.5" />
-        <span>Reamarrar</span>
+        {ehRecorrenteAgendado ? (
+          <Repeat className="h-3.5 w-3.5" />
+        ) : (
+          <RotateCcw className="h-3.5 w-3.5" />
+        )}
+        <span>{ehRecorrenteAgendado ? 'Voltar p/ hoje' : 'Reamarrar'}</span>
       </Botao>
       <Botao variante="fantasma" apenasIcone aria-label="Fechar aviso" onClick={aoDispensar}>
         <X className="h-3.5 w-3.5" />

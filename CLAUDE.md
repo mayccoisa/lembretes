@@ -22,7 +22,8 @@ Valem aqui todas as regras do **Livro de Decisões Técnico** do Product Hub (`.
 | Arte vetorial e animação | `src/components/arte/` | Lacinho discreto e animação física do laço se desfazendo |
 | Mural estilo Keep | `src/components/mural/` | Compositor, cartão do laço, modal de edição, lightbox e aviso de desfazer |
 | Atalho flutuante do Windows | `src/components/widget/` | Janela transparente arrastável do lacinho discreto (`?janela=widget`) |
-| Shell nativo e SQLite | `src-tauri/src/` | Tauri v2, `rusqlite` sem `SELECT *`, bandeja do sistema, atalho global `Ctrl+Alt+L` e janelas |
+| Servidor MCP oficial | `mcp/` | Servidor `stdio` autoexplicativo sobre SQLite `WAL` com anti-duplicata (`chaveExterna`) e sincronia ao vivo |
+| Shell nativo e SQLite | `src-tauri/src/` | Tauri v2, `rusqlite` sem `SELECT *`, bandeja do sistema, atalho global `Ctrl+Alt+L`, auto-updater e janelas |
 
 ## Fronteiras invioláveis
 
@@ -54,5 +55,5 @@ npm run tauri:build    # Gera o instalador nativo do Windows (.msi / .exe)
 
 ## Orçamento de performance (Passo 7 · T-09)
 
-* **Base medida no boot (`dist/index.html` gzipped):** **96,9 KB gzip** (`90,1 KB` JS + `6,4 KB` CSS + `0,3 KB` HTML, medido por `npm run medir:boot` em 19/11/2026 na `v0.2.0`).
+* **Base medida no boot (`dist/index.html` gzipped):** **100,7 KB gzip** (`93,9 KB` JS + `6,5 KB` CSS + `0,3 KB` HTML, medido por `npm run medir:boot` em 19/11/2026 na `v0.3.0`).
 * **Teto declarado:** **120 KB gzip**. Fatia que ultrapassar o teto bloqueia até ser otimizada ou ter aumento aprovado pelo dono.

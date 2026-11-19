@@ -357,9 +357,14 @@ pub fn run() {
                     let mut leitor = BufReader::new(conexao);
                     let mut comando = String::new();
                     let _ = leitor.read_line(&mut comando);
-                    if comando.trim() == "SAIR" {
+                    let cmd = comando.trim();
+                    if cmd == "SAIR" {
                         handle_ipc.exit(0);
                         break;
+                    }
+                    if cmd == "RECARREGAR" {
+                        let _ = handle_ipc.emit("lacos:mudou", ());
+                        continue;
                     }
                     mostrar_mural(&handle_ipc, false, false);
                 }

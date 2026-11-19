@@ -1,4 +1,9 @@
-import type { AtualizarLacoInput, Laco, NovoLacoInput } from '../contracts/laco';
+import {
+  calcularProximoCicloRecorrente,
+  type AtualizarLacoInput,
+  type Laco,
+  type NovoLacoInput,
+} from '../contracts/laco';
 
 const CHAVE_STORAGE = 'lembretes:lacos:v1';
 
@@ -7,6 +12,34 @@ function gerarId(): string {
     return crypto.randomUUID();
   }
   return `laco-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+}
+
+function normalizarLacoLegado(parcial: Partial<Laco> & { id: string }): Laco {
+  const agora = new Date().toISOString();
+  return {
+    id: parcial.id,
+    titulo: parcial.titulo ?? '',
+    modo: parcial.modo ?? 'texto',
+    texto: parcial.texto ?? '',
+    itens: parcial.itens ?? [],
+    corFita: parcial.corFita ?? 'carmim',
+    imagemUrl: parcial.imagemUrl ?? null,
+    imagemNome: parcial.imagemNome ?? null,
+    fixado: Boolean(parcial.fixado),
+    lembrarEm: parcial.lembrarEm ?? null,
+    notificadoEm: parcial.notificadoEm ?? null,
+    recorrencia: parcial.recorrencia ?? null,
+    intervaloRecorrencia: parcial.intervaloRecorrencia ?? 1,
+    ocultoAte: parcial.ocultoAte ?? null,
+    chaveExterna: parcial.chaveExterna ?? null,
+    canalOrigem: parcial.canalOrigem ?? null,
+    estado: parcial.estado ?? 'ativo',
+    desfeitoEm: parcial.desfeitoEm ?? null,
+    createdAt: parcial.createdAt ?? agora,
+    updatedAt: parcial.updatedAt ?? agora,
+    deletedAt: parcial.deletedAt ?? null,
+    syncVersion: parcial.syncVersion ?? 1,
+  };
 }
 
 function criarIlustracaoExemploSvg(): string {
@@ -24,49 +57,19 @@ function criarIlustracaoExemploSvg(): string {
 function semearExemplosIniciais(): Laco[] {
   const agora = new Date().toISOString();
   return [
-    {
+    normalizarLacoLegado({
       id: gerarId(),
       titulo: 'Bem-vindo ao Lembretes!',
       modo: 'texto',
       texto:
         'Cada nota aqui é um laço amarrado para você não esquecer. Experimente clicar ou puxar a pontinha do laço ali em cima para ver ele se desfazendo!',
-      itens: [],
       corFita: 'carmim',
       imagemUrl: criarIlustracaoExemploSvg(),
       imagemNome: 'exemplo-laco.svg',
       fixado: true,
-      lembrarEm: null,
-      notificadoEm: null,
-      estado: 'ativo',
-      desfeitoEm: null,
       createdAt: agora,
       updatedAt: agora,
-      deletedAt: null,
-      syncVersion: 1,
-    },
-    {
-      id: gerarId(),
-      titulo: 'Antes de sair de casa',
-      modo: 'checklist',
-      texto: '',
-      itens: [
-        { id: gerarId(), texto: 'Separar documento e carteira', concluido: true },
-        { id: gerarId(), texto: 'Passar no correio com o pacote', concluido: false },
-        { id: gerarId(), texto: 'Comprar café em grãos', concluido: false },
-      ],
-      corFita: 'ambar',
-      imagemUrl: null,
-      imagemNome: null,
-      fixado: false,
-      lembrarEm: null,
-      notificadoEm: null,
-      estado: 'ativo',
-      desfeitoEm: null,
-      createdAt: agora,
-      updatedAt: agora,
-      deletedAt: null,
-      syncVersion: 1,
-    },
+    }),
   ];
 }
 
@@ -79,8 +82,8 @@ function lerBancoLocal(): Laco[] {
     return iniciais;
   }
   try {
-    const parsed = JSON.parse(bruto) as Laco[];
-    return Array.isArray(parsed) ? parsed : [];
+    const parsed = JSON.parse(bruto) as Array<Partial<Laco> & { id: string }>;
+    return Array.isArray(parsed) ? parsed.map(normalizarLacoLegado) : [];
   } catch {
     return [];
   }
@@ -105,6 +108,32 @@ export function fallbackListarLacos(): Laco[] {
 }
 
 export function fallbackCriarLaco(input: NovoLacoInput): Laco {
+  const todos = lerBancoLocal();
+  const chave = input.chaveExterna?.trim() || null;
+
+  if (chave) {
+    const existente = todos.find(
+      (l) => l.chaveExterna === chave && l.deletedAt === null && l.estado === 'ativo'
+    );
+    if (existente) {
+      return fallbackAtualizarLaco({
+        id: existente.id,
+        titulo: input.titulo,
+        modo: input.modo,
+        texto: input.texto,
+        itens: input.itens,
+        corFita: input.corFita,
+        imagemUrl: input.imagemUrl,
+        imagemNome: input.imagemNome,
+        fixado: input.fixado,
+        lembrarEm: input.lembrarEm,
+        recorrencia: input.recorrencia,
+        intervaloRecorrencia: input.intervaloRecorrencia,
+        canalOrigem: input.canalOrigem,
+      });
+    }
+  }
+
   const agora = new Date().toISOString();
   const laco: Laco = {
     id: gerarId(),
@@ -118,6 +147,11 @@ export function fallbackCriarLaco(input: NovoLacoInput): Laco {
     fixado: Boolean(input.fixado),
     lembrarEm: input.lembrarEm ?? null,
     notificadoEm: null,
+    recorrencia: input.recorrencia ?? null,
+    intervaloRecorrencia: Math.max(1, input.intervaloRecorrencia ?? 1),
+    ocultoAte: null,
+    chaveExterna: chave,
+    canalOrigem: input.canalOrigem?.trim() || null,
     estado: 'ativo',
     desfeitoEm: null,
     createdAt: agora,
@@ -125,7 +159,6 @@ export function fallbackCriarLaco(input: NovoLacoInput): Laco {
     deletedAt: null,
     syncVersion: 1,
   };
-  const todos = lerBancoLocal();
   gravarBancoLocal([laco, ...todos]);
   return laco;
 }
@@ -154,6 +187,14 @@ export function fallbackAtualizarLaco(input: AtualizarLacoInput): Laco {
         : input.notificadoEm !== undefined
           ? input.notificadoEm
           : atual.notificadoEm,
+    recorrencia: input.recorrencia !== undefined ? input.recorrencia : atual.recorrencia,
+    intervaloRecorrencia:
+      input.intervaloRecorrencia !== undefined
+        ? Math.max(1, input.intervaloRecorrencia)
+        : atual.intervaloRecorrencia,
+    ocultoAte: input.ocultoAte !== undefined ? input.ocultoAte : atual.ocultoAte,
+    chaveExterna: input.chaveExterna !== undefined ? input.chaveExterna : atual.chaveExterna,
+    canalOrigem: input.canalOrigem !== undefined ? input.canalOrigem : atual.canalOrigem,
     updatedAt: new Date().toISOString(),
     syncVersion: atual.syncVersion + 1,
   };
@@ -168,13 +209,41 @@ export function fallbackDesfazerLaco(id: string): Laco {
   if (indice < 0) {
     throw new Error(`Laco nao encontrado: ${id}`);
   }
-  const agora = new Date().toISOString();
+  const atual = todos[indice];
+  const agora = new Date();
+  const agoraIso = agora.toISOString();
+
+  // Opcao recomendada: se for recorrente, reagenda e esconde ate o proximo ciclo!
+  if (atual.recorrencia) {
+    const ciclo = calcularProximoCicloRecorrente(
+      atual.recorrencia,
+      atual.intervaloRecorrencia,
+      atual.lembrarEm,
+      agora
+    );
+    const itensResetados = atual.itens.map((it) => ({ ...it, concluido: false }));
+    const reagendado: Laco = {
+      ...atual,
+      itens: itensResetados,
+      lembrarEm: ciclo.proximoLembrarEm,
+      ocultoAte: ciclo.ocultoAte,
+      notificadoEm: null,
+      estado: 'ativo',
+      desfeitoEm: agoraIso,
+      updatedAt: agoraIso,
+      syncVersion: atual.syncVersion + 1,
+    };
+    todos[indice] = reagendado;
+    gravarBancoLocal(todos);
+    return reagendado;
+  }
+
   const atualizado: Laco = {
-    ...todos[indice],
+    ...atual,
     estado: 'desfeito',
-    desfeitoEm: agora,
-    updatedAt: agora,
-    syncVersion: todos[indice].syncVersion + 1,
+    desfeitoEm: agoraIso,
+    updatedAt: agoraIso,
+    syncVersion: atual.syncVersion + 1,
   };
   todos[indice] = atualizado;
   gravarBancoLocal(todos);
@@ -191,6 +260,7 @@ export function fallbackReamarrarLaco(id: string): Laco {
   const atualizado: Laco = {
     ...todos[indice],
     estado: 'ativo',
+    ocultoAte: null,
     desfeitoEm: null,
     updatedAt: agora,
     syncVersion: todos[indice].syncVersion + 1,

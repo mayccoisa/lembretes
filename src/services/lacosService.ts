@@ -1,5 +1,7 @@
 import {
+  lacoEstaOcultoAteProximoCiclo,
   lacoTemConteudoValido,
+  lacoVenceHoje,
   type AtualizarLacoInput,
   type EstadoLaco,
   type Laco,
@@ -41,6 +43,24 @@ export type { ModoAtalhoWindows };
 
 const CANAL_SYNC = 'lembretes-sync-canal';
 const CHAVE_RASCUNHO = 'lembretes:rascunho-ativo:v1';
+const CHAVE_RESUMO_HOJE = 'lembretes:resumo-diario:v1';
+
+interface RegistroResumoDiario {
+  dataLocal: string;
+  quantidadeNotificada: number;
+}
+
+function chaveDataLocalHoje(ref = new Date()): string {
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${ref.getFullYear()}-${pad(ref.getMonth() + 1)}-${pad(ref.getDate())}`;
+}
+
+function avisarOutrasAbas(): void {
+  if (typeof BroadcastChannel === 'undefined') return;
+  const canal = new BroadcastChannel(CANAL_SYNC);
+  canal.postMessage({ tipo: 'mudou' });
+  canal.close();
+}
 
 export function salvarRascunhoCompositor(input: NovoLacoInput): void {
   if (typeof localStorage === 'undefined') return;
@@ -75,15 +95,14 @@ export async function recuperarRascunhoInterrompido(): Promise<Laco | null> {
   return criarLaco(pendente, false);
 }
 
-function avisarOutrasAbas(): void {
-  if (typeof BroadcastChannel === 'undefined') return;
-  const canal = new BroadcastChannel(CANAL_SYNC);
-  canal.postMessage({ tipo: 'mudou' });
-  canal.close();
-}
-
-export function ordenarLacos(lacos: Laco[], estado: EstadoLaco): Laco[] {
-  const filtrados = lacos.filter((l) => l.estado === estado && l.deletedAt === null);
+export function ordenarLacos(lacos: Laco[], estado: EstadoLaco, agoraMs = Date.now()): Laco[] {
+  const filtrados = lacos.filter((l) => {
+    if (l.deletedAt !== null || l.estado !== estado) return false;
+    if (estado === 'ativo' && lacoEstaOcultoAteProximoCiclo(l, agoraMs)) {
+      return false;
+    }
+    return true;
+  });
   return [...filtrados].sort((a, b) => {
     if (estado === 'ativo' && a.fixado !== b.fixado) {
       return a.fixado ? -1 : 1;
@@ -94,6 +113,18 @@ export function ordenarLacos(lacos: Laco[], estado: EstadoLaco): Laco[] {
   });
 }
 
+export function listarAgendadosRecorrentes(lacos: Laco[], agoraMs = Date.now()): Laco[] {
+  return lacos
+    .filter((l) => l.deletedAt === null && lacoEstaOcultoAteProximoCiclo(l, agoraMs))
+    .sort((a, b) => (a.lembrarEm ?? a.ocultoAte ?? '').localeCompare(b.lembrarEm ?? b.ocultoAte ?? ''));
+}
+
+export function listarVencendoHoje(lacos: Laco[], referencia = new Date()): Laco[] {
+  return lacos
+    .filter((l) => lacoVenceHoje(l, referencia))
+    .sort((a, b) => (a.lembrarEm ?? '').localeCompare(b.lembrarEm ?? ''));
+}
+
 export function filtrarPorBusca(lacos: Laco[], busca: string): Laco[] {
   const termo = busca.trim().toLowerCase();
   if (!termo) return lacos;
@@ -102,12 +133,14 @@ export function filtrarPorBusca(lacos: Laco[], busca: string): Laco[] {
     if (l.texto.toLowerCase().includes(termo)) return true;
     if (l.itens.some((item) => item.texto.toLowerCase().includes(termo))) return true;
     if (l.imagemNome && l.imagemNome.toLowerCase().includes(termo)) return true;
+    if (l.canalOrigem && l.canalOrigem.toLowerCase().includes(termo)) return true;
     return false;
   });
 }
 
 export function lacoEstaVencido(laco: Laco, referenciaMs = Date.now()): boolean {
   if (laco.estado !== 'ativo' || !laco.lembrarEm) return false;
+  if (lacoEstaOcultoAteProximoCiclo(laco, referenciaMs)) return false;
   const alvo = new Date(laco.lembrarEm).getTime();
   return !Number.isNaN(alvo) && alvo <= referenciaMs;
 }
@@ -174,19 +207,77 @@ export async function lerArquivoImagem(arquivo: File): Promise<{ url: string; no
   return { url: urlSalva, nome };
 }
 
+export function montarTextoResumoHoje(vencendoHoje: Laco[]): {
+  titulo: string;
+  corpo: string;
+} | null {
+  const qtd = vencendoHoje.length;
+  if (qtd === 0) return null;
+
+  const resumoNomes = vencendoHoje
+    .slice(0, 3)
+    .map((l) => l.titulo || l.texto.slice(0, 42) || 'Lembrança com imagem')
+    .join(' · ');
+
+  if (qtd === 1) {
+    return {
+      titulo: '1 lembrete vence hoje',
+      corpo: resumoNomes,
+    };
+  }
+  return {
+    titulo: `${qtd} lembretes vencem hoje`,
+    corpo: `Para hoje: ${resumoNomes}`,
+  };
+}
+
+export async function dispararResumoDiarioSeNecessario(
+  lacos: Laco[],
+  forcar = false
+): Promise<boolean> {
+  const deHoje = listarVencendoHoje(lacos);
+  const mensagem = montarTextoResumoHoje(deHoje);
+  if (!mensagem) return false;
+
+  const hoje = chaveDataLocalHoje();
+  if (!forcar && typeof localStorage !== 'undefined') {
+    try {
+      const salvo = localStorage.getItem(CHAVE_RESUMO_HOJE);
+      if (salvo) {
+        const reg = JSON.parse(salvo) as RegistroResumoDiario;
+        if (reg.dataLocal === hoje && deHoje.length <= reg.quantidadeNotificada) {
+          return false;
+        }
+      }
+    } catch {
+      // prossegue
+    }
+  }
+
+  await tauriNotificarLembrete(mensagem.titulo, mensagem.corpo);
+  if (typeof localStorage !== 'undefined') {
+    const novoReg: RegistroResumoDiario = {
+      dataLocal: hoje,
+      quantidadeNotificada: deHoje.length,
+    };
+    localStorage.setItem(CHAVE_RESUMO_HOJE, JSON.stringify(novoReg));
+  }
+  return true;
+}
+
 export async function verificarNotificacoesPendentes(lacos: Laco[]): Promise<boolean> {
   const agoraMs = Date.now();
   let disparouAlgum = false;
   for (const laco of lacos) {
     if (lacoEstaVencido(laco, agoraMs) && !laco.notificadoEm) {
-      const titulo = laco.titulo || 'Laco esperando por voce!';
+      const titulo = laco.titulo || 'Laço esperando por você!';
       const corpo =
         laco.modo === 'checklist'
           ? laco.itens
               .filter((i) => !i.concluido)
               .map((i) => i.texto)
               .slice(0, 2)
-              .join(' · ') || 'Confira os itens anotados no seu laco.'
+              .join(' · ') || 'Confira os itens anotados no seu laço.'
           : laco.texto.slice(0, 110) || 'Abra seus lembretes para conferir a imagem.';
       await tauriNotificarLembrete(titulo, corpo);
       await atualizarLaco({ id: laco.id, notificadoEm: new Date(agoraMs).toISOString() });
@@ -239,6 +330,9 @@ export const acoesJanela = {
 export const testesInternos = {
   resetarBancoLocal: (vazio = true) => {
     limparRascunhoCompositor();
+    if (typeof localStorage !== 'undefined') {
+      localStorage.removeItem(CHAVE_RESUMO_HOJE);
+    }
     fallbackResetarParaTeste(vazio);
   },
 };

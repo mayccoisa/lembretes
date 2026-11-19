@@ -36,6 +36,7 @@ for (const arq of listarArquivos(path.join(ROOT, 'src', 'components'))) {
 
 for (const arq of [
   ...listarArquivos(path.join(ROOT, 'src')),
+  ...listarArquivos(path.join(ROOT, 'mcp')),
   ...listarArquivos(path.join(ROOT, 'src-tauri', 'src')),
 ]) {
   const rel = path.relative(ROOT, arq);

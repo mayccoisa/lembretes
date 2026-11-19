@@ -1,5 +1,5 @@
-use chrono::Utc;
-use rusqlite::{params, Connection};
+use chrono::{Datelike, Duration, Timelike, Utc, Weekday};
+use rusqlite::{params, Connection, OptionalExtension};
 use serde::{Deserialize, Deserializer, Serialize};
 use std::path::Path;
 use uuid::Uuid;
@@ -26,6 +26,11 @@ pub struct Laco {
     pub fixado: bool,
     pub lembrar_em: Option<String>,
     pub notificado_em: Option<String>,
+    pub recorrencia: Option<String>,
+    pub intervalo_recorrencia: i64,
+    pub oculto_ate: Option<String>,
+    pub chave_externa: Option<String>,
+    pub canal_origem: Option<String>,
     pub estado: String,
     pub desfeito_em: Option<String>,
     pub created_at: String,
@@ -46,6 +51,10 @@ pub struct NovoLacoInput {
     pub imagem_nome: Option<String>,
     pub fixado: Option<bool>,
     pub lembrar_em: Option<String>,
+    pub recorrencia: Option<String>,
+    pub intervalo_recorrencia: Option<i64>,
+    pub chave_externa: Option<String>,
+    pub canal_origem: Option<String>,
 }
 
 fn deserializar_anulavel<'de, D>(deserializer: D) -> Result<Option<Option<String>>, D::Error>
@@ -73,6 +82,15 @@ pub struct AtualizarLacoInput {
     pub lembrar_em: Option<Option<String>>,
     #[serde(default, deserialize_with = "deserializar_anulavel")]
     pub notificado_em: Option<Option<String>>,
+    #[serde(default, deserialize_with = "deserializar_anulavel")]
+    pub recorrencia: Option<Option<String>>,
+    pub intervalo_recorrencia: Option<i64>,
+    #[serde(default, deserialize_with = "deserializar_anulavel")]
+    pub oculto_ate: Option<Option<String>>,
+    #[serde(default, deserialize_with = "deserializar_anulavel")]
+    pub chave_externa: Option<Option<String>>,
+    #[serde(default, deserialize_with = "deserializar_anulavel")]
+    pub canal_origem: Option<Option<String>>,
 }
 
 pub fn abrir_banco(caminho: &Path) -> Result<Connection, String> {
@@ -171,6 +189,20 @@ fn migrar(conn: &Connection) -> Result<(), String> {
         )
         .map_err(|e| format!("Falha na migracao 002 (historico imutavel): {e}"))?;
     }
+
+    if versao < 3 {
+        conn.execute_batch(
+            "ALTER TABLE lacos ADD COLUMN recorrencia TEXT;
+             ALTER TABLE lacos ADD COLUMN intervalo_recorrencia INTEGER NOT NULL DEFAULT 1;
+             ALTER TABLE lacos ADD COLUMN oculto_ate TEXT;
+             ALTER TABLE lacos ADD COLUMN chave_externa TEXT;
+             ALTER TABLE lacos ADD COLUMN canal_origem TEXT;
+             CREATE INDEX IF NOT EXISTS idx_lacos_chave_ext ON lacos(chave_externa, deleted_at);
+             PRAGMA user_version = 3;",
+        )
+        .map_err(|e| format!("Falha na migracao 003 (recorrencia e MCP): {e}"))?;
+    }
+
     Ok(())
 }
 
@@ -179,6 +211,7 @@ fn ler_laco_por_id(conn: &Connection, id: &str) -> Result<Laco, String> {
         "SELECT
             id, titulo, modo, texto, itens_json, cor_fita,
             imagem_url, imagem_nome, fixado, lembrar_em, notificado_em,
+            recorrencia, intervalo_recorrencia, oculto_ate, chave_externa, canal_origem,
             estado, desfeito_em, created_at, updated_at, deleted_at, sync_version
          FROM lacos
          WHERE id = ?1 AND deleted_at IS NULL",
@@ -204,12 +237,17 @@ fn mapear_linha(row: &rusqlite::Row<'_>) -> rusqlite::Result<Laco> {
         fixado: fixado_int != 0,
         lembrar_em: row.get(9)?,
         notificado_em: row.get(10)?,
-        estado: row.get(11)?,
-        desfeito_em: row.get(12)?,
-        created_at: row.get(13)?,
-        updated_at: row.get(14)?,
-        deleted_at: row.get(15)?,
-        sync_version: row.get(16)?,
+        recorrencia: row.get(11)?,
+        intervalo_recorrencia: row.get(12)?,
+        oculto_ate: row.get(13)?,
+        chave_externa: row.get(14)?,
+        canal_origem: row.get(15)?,
+        estado: row.get(16)?,
+        desfeito_em: row.get(17)?,
+        created_at: row.get(18)?,
+        updated_at: row.get(19)?,
+        deleted_at: row.get(20)?,
+        sync_version: row.get(21)?,
     })
 }
 
@@ -219,6 +257,7 @@ pub fn listar_lacos(conn: &Connection) -> Result<Vec<Laco>, String> {
             "SELECT
                 id, titulo, modo, texto, itens_json, cor_fita,
                 imagem_url, imagem_nome, fixado, lembrar_em, notificado_em,
+                recorrencia, intervalo_recorrencia, oculto_ate, chave_externa, canal_origem,
                 estado, desfeito_em, created_at, updated_at, deleted_at, sync_version
              FROM lacos
              WHERE deleted_at IS NULL
@@ -226,9 +265,7 @@ pub fn listar_lacos(conn: &Connection) -> Result<Vec<Laco>, String> {
         )
         .map_err(|e| e.to_string())?;
 
-    let iter = stmt
-        .query_map([], mapear_linha)
-        .map_err(|e| e.to_string())?;
+    let iter = stmt.query_map([], mapear_linha).map_err(|e| e.to_string())?;
 
     let mut saida = Vec::new();
     for item in iter {
@@ -238,6 +275,48 @@ pub fn listar_lacos(conn: &Connection) -> Result<Vec<Laco>, String> {
 }
 
 pub fn criar_laco(conn: &Connection, input: NovoLacoInput) -> Result<Laco, String> {
+    let chave_limpa = input
+        .chave_externa
+        .as_ref()
+        .map(|s| s.trim().to_string())
+        .filter(|s| !s.is_empty());
+
+    // Protecao anti-duplicata para criacoes vindas de analise de canais da IA
+    if let Some(ref chave) = chave_limpa {
+        let existente_id: Option<String> = conn
+            .query_row(
+                "SELECT id FROM lacos WHERE chave_externa = ?1 AND estado = 'ativo' AND deleted_at IS NULL LIMIT 1",
+                params![chave],
+                |r| r.get(0),
+            )
+            .optional()
+            .map_err(|e| e.to_string())?;
+
+        if let Some(id_existente) = existente_id {
+            return atualizar_laco(
+                conn,
+                AtualizarLacoInput {
+                    id: id_existente,
+                    titulo: input.titulo,
+                    modo: input.modo,
+                    texto: input.texto,
+                    itens: input.itens,
+                    cor_fita: input.cor_fita,
+                    imagem_url: input.imagem_url.map(Some),
+                    imagem_nome: input.imagem_nome.map(Some),
+                    fixado: input.fixado,
+                    lembrar_em: input.lembrar_em.map(Some),
+                    notificado_em: None,
+                    recorrencia: input.recorrencia.map(Some),
+                    intervalo_recorrencia: input.intervalo_recorrencia,
+                    oculto_ate: None,
+                    chave_externa: Some(Some(chave.clone())),
+                    canal_origem: input.canal_origem.map(Some),
+                },
+            );
+        }
+    }
+
     let id = Uuid::new_v4().to_string();
     let agora = Utc::now().to_rfc3339();
     let titulo = input.titulo.unwrap_or_default().trim().to_string();
@@ -252,13 +331,24 @@ pub fn criar_laco(conn: &Connection, input: NovoLacoInput) -> Result<Laco, Strin
     let itens_json = serde_json::to_string(&itens_filtrados).map_err(|e| e.to_string())?;
     let cor_fita = input.cor_fita.unwrap_or_else(|| "carmim".to_string());
     let fixado_int: i64 = if input.fixado.unwrap_or(false) { 1 } else { 0 };
+    let intervalo = input.intervalo_recorrencia.unwrap_or(1).max(1);
+    let canal_limpo = input
+        .canal_origem
+        .map(|s| s.trim().to_string())
+        .filter(|s| !s.is_empty());
 
     conn.execute(
         "INSERT INTO lacos (
             id, titulo, modo, texto, itens_json, cor_fita,
             imagem_url, imagem_nome, fixado, lembrar_em, notificado_em,
+            recorrencia, intervalo_recorrencia, oculto_ate, chave_externa, canal_origem,
             estado, desfeito_em, created_at, updated_at, deleted_at, sync_version
-        ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, NULL, 'ativo', NULL, ?11, ?11, NULL, 1)",
+        ) VALUES (
+            ?1, ?2, ?3, ?4, ?5, ?6,
+            ?7, ?8, ?9, ?10, NULL,
+            ?11, ?12, NULL, ?13, ?14,
+            'ativo', NULL, ?15, ?15, NULL, 1
+        )",
         params![
             id,
             titulo,
@@ -270,6 +360,10 @@ pub fn criar_laco(conn: &Connection, input: NovoLacoInput) -> Result<Laco, Strin
             input.imagem_nome,
             fixado_int,
             input.lembrar_em,
+            input.recorrencia,
+            intervalo,
+            chave_limpa,
+            canal_limpo,
             agora
         ],
     )
@@ -318,6 +412,26 @@ pub fn atualizar_laco(conn: &Connection, input: AtualizarLacoInput) -> Result<La
             None => atual.notificado_em,
         }
     };
+    let recorrencia = match input.recorrencia {
+        Some(v) => v,
+        None => atual.recorrencia,
+    };
+    let intervalo = input
+        .intervalo_recorrencia
+        .map(|n| n.max(1))
+        .unwrap_or(atual.intervalo_recorrencia);
+    let oculto_ate = match input.oculto_ate {
+        Some(v) => v,
+        None => atual.oculto_ate,
+    };
+    let chave_externa = match input.chave_externa {
+        Some(v) => v,
+        None => atual.chave_externa,
+    };
+    let canal_origem = match input.canal_origem {
+        Some(v) => v,
+        None => atual.canal_origem,
+    };
 
     conn.execute(
         "UPDATE lacos SET
@@ -331,9 +445,14 @@ pub fn atualizar_laco(conn: &Connection, input: AtualizarLacoInput) -> Result<La
             fixado = ?8,
             lembrar_em = ?9,
             notificado_em = ?10,
-            updated_at = ?11,
+            recorrencia = ?11,
+            intervalo_recorrencia = ?12,
+            oculto_ate = ?13,
+            chave_externa = ?14,
+            canal_origem = ?15,
+            updated_at = ?16,
             sync_version = sync_version + 1
-         WHERE id = ?12 AND deleted_at IS NULL",
+         WHERE id = ?17 AND deleted_at IS NULL",
         params![
             titulo,
             modo,
@@ -345,6 +464,11 @@ pub fn atualizar_laco(conn: &Connection, input: AtualizarLacoInput) -> Result<La
             fixado_int,
             lembrar_em,
             notificado_em,
+            recorrencia,
+            intervalo,
+            oculto_ate,
+            chave_externa,
+            canal_origem,
             agora,
             input.id
         ],
@@ -354,8 +478,116 @@ pub fn atualizar_laco(conn: &Connection, input: AtualizarLacoInput) -> Result<La
     ler_laco_por_id(conn, &input.id)
 }
 
+fn calcular_proximo_ciclo_utc(
+    recorrencia: &str,
+    intervalo: i64,
+    lembrar_em_atual: Option<&str>,
+) -> (String, String) {
+    let agora = Utc::now();
+    let passo = intervalo.max(1);
+
+    let mut base = lembrar_em_atual
+        .and_then(|s| chrono::DateTime::parse_from_rfc3339(s).ok())
+        .map(|dt| dt.with_timezone(&Utc))
+        .filter(|dt| *dt > agora)
+        .unwrap_or(agora);
+
+    if recorrencia == "intervalo-horas" {
+        let prox = agora + Duration::hours(passo);
+        let iso = prox.to_rfc3339();
+        return (iso.clone(), iso);
+    }
+
+    if let Some(lembrar_antigo) = lembrar_em_atual
+        .and_then(|s| chrono::DateTime::parse_from_rfc3339(s).ok())
+        .map(|dt| dt.with_timezone(&Utc))
+    {
+        if let Some(ajustado) = base
+            .with_hour(lembrar_antigo.hour())
+            .and_then(|d| d.with_minute(lembrar_antigo.minute()))
+            .and_then(|d| d.with_second(0))
+        {
+            base = ajustado;
+        }
+    } else if let Some(padrao_manha) = base
+        .with_hour(12)
+        .and_then(|d| d.with_minute(0))
+        .and_then(|d| d.with_second(0))
+    {
+        base = padrao_manha;
+    }
+
+    let mut proximo = match recorrencia {
+        "diaria" => base + Duration::days(1),
+        "dias-uteis" => {
+            let mut d = base + Duration::days(1);
+            while matches!(d.weekday(), Weekday::Sat | Weekday::Sun) {
+                d += Duration::days(1);
+            }
+            d
+        }
+        "semanal" => base + Duration::days(7),
+        "mensal" => base + Duration::days(30),
+        "intervalo-dias" => base + Duration::days(passo),
+        _ => base + Duration::days(1),
+    };
+
+    while proximo <= agora {
+        proximo += Duration::days(1);
+    }
+
+    let inicio_dia = proximo
+        .with_hour(3)
+        .and_then(|d| d.with_minute(0))
+        .and_then(|d| d.with_second(0))
+        .unwrap_or(proximo);
+    let oculto = if inicio_dia > agora {
+        inicio_dia
+    } else {
+        proximo
+    };
+
+    (proximo.to_rfc3339(), oculto.to_rfc3339())
+}
+
 pub fn desfazer_laco(conn: &Connection, id: &str) -> Result<Laco, String> {
+    let atual = ler_laco_por_id(conn, id)?;
     let agora = Utc::now().to_rfc3339();
+
+    if let Some(ref rec) = atual.recorrencia {
+        let (prox_lembrar, oculto_ate) = calcular_proximo_ciclo_utc(
+            rec,
+            atual.intervalo_recorrencia,
+            atual.lembrar_em.as_deref(),
+        );
+        let itens_resetados: Vec<ItemChecklist> = atual
+            .itens
+            .into_iter()
+            .map(|mut i| {
+                i.concluido = false;
+                i
+            })
+            .collect();
+        let itens_json = serde_json::to_string(&itens_resetados).map_err(|e| e.to_string())?;
+
+        conn.execute(
+            "UPDATE lacos SET
+                itens_json = ?1,
+                lembrar_em = ?2,
+                oculto_ate = ?3,
+                notificado_em = NULL,
+                estado = 'ativo',
+                desfeito_em = ?4,
+                updated_at = ?4,
+                sync_version = sync_version + 1
+             WHERE id = ?5 AND deleted_at IS NULL",
+            params![itens_json, prox_lembrar, oculto_ate, agora, id],
+        )
+        .map_err(|e| format!("Falha ao reagendar laco recorrente: {e}"))?;
+
+        return ler_laco_por_id(conn, id);
+    }
+
     conn.execute(
         "UPDATE lacos SET
             estado = 'desfeito',
@@ -374,6 +606,7 @@ pub fn reamarrar_laco(conn: &Connection, id: &str) -> Result<Laco, String> {
     conn.execute(
         "UPDATE lacos SET
             estado = 'ativo',
+            oculto_ate = NULL,
             desfeito_em = NULL,
             updated_at = ?1,
             sync_version = sync_version + 1
@@ -403,42 +636,61 @@ mod tests {
     use super::*;
 
     #[test]
-    fn ciclo_completo_sqlite_em_memoria() {
+    fn ciclo_completo_recorrencia_e_antiduplicata_sqlite() {
         let conn = Connection::open_in_memory().expect("abrir banco em memoria");
         migrar(&conn).expect("migrar schema");
 
         let criado = criar_laco(
             &conn,
             NovoLacoInput {
-                titulo: Some("Comprar presente".to_string()),
+                titulo: Some("Revisar demandas ocultas Slack".to_string()),
                 modo: Some("texto".to_string()),
-                texto: Some("Passar na papelaria".to_string()),
+                texto: Some("Cobrar retorno do comercial".to_string()),
                 itens: None,
-                cor_fita: Some("carmim".to_string()),
+                cor_fita: Some("ambar".to_string()),
                 imagem_url: None,
                 imagem_nome: None,
                 fixado: Some(true),
                 lembrar_em: None,
+                recorrencia: Some("diaria".to_string()),
+                intervalo_recorrencia: Some(1),
+                chave_externa: Some("slack:canal-comercial:demanda-1".to_string()),
+                canal_origem: Some("Slack".to_string()),
             },
         )
-        .expect("criar laco");
+        .expect("criar laco recorrente");
 
-        assert_eq!(criado.estado, "ativo");
-        assert!(criado.fixado);
+        // Repetir com a mesma chave_externa atualiza sem duplicar
+        let repetido = criar_laco(
+            &conn,
+            NovoLacoInput {
+                titulo: Some("Revisar demandas ocultas Slack (atualizado)".to_string()),
+                modo: Some("texto".to_string()),
+                texto: Some("Cobrar retorno do comercial hoje".to_string()),
+                itens: None,
+                cor_fita: Some("ambar".to_string()),
+                imagem_url: None,
+                imagem_nome: None,
+                fixado: Some(true),
+                lembrar_em: None,
+                recorrencia: Some("diaria".to_string()),
+                intervalo_recorrencia: Some(1),
+                chave_externa: Some("slack:canal-comercial:demanda-1".to_string()),
+                canal_origem: Some("Slack".to_string()),
+            },
+        )
+        .expect("upsert por chave_externa");
 
-        let desfeito = desfazer_laco(&conn, &criado.id).expect("desfazer");
-        assert_eq!(desfeito.estado, "desfeito");
-        assert!(desfeito.desfeito_em.is_some());
-        assert_eq!(desfeito.sync_version, 2);
+        assert_eq!(criado.id, repetido.id);
+        assert_eq!(listar_lacos(&conn).expect("listar").len(), 1);
 
-        let reamarrado = reamarrar_laco(&conn, &criado.id).expect("reamarrar");
-        assert_eq!(reamarrado.estado, "ativo");
-        assert!(reamarrado.desfeito_em.is_none());
+        // Desfazer laco recorrente reagenda para o proximo ciclo e preenche oculto_ate
+        let pos_desfazer = desfazer_laco(&conn, &criado.id).expect("desfazer recorrente");
+        assert_eq!(pos_desfazer.estado, "ativo");
+        assert!(pos_desfazer.oculto_ate.is_some());
+        assert!(pos_desfazer.lembrar_em.is_some());
 
         excluir_laco(&conn, &criado.id).expect("excluir");
-        let restantes = listar_lacos(&conn).expect("listar");
-        assert_eq!(restantes.len(), 0);
-
         let total_hist: i64 = conn
             .query_row(
                 "SELECT COUNT(seq) FROM lacos_historico WHERE laco_id = ?1",

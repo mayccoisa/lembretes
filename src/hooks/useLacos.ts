@@ -6,12 +6,15 @@ import {
   atualizarLaco,
   criarLaco,
   desfazerLaco,
+  dispararResumoDiarioSeNecessario,
   excluirLaco,
   filtrarPorBusca,
   lacoEstaVencido,
   lerArquivoImagem,
   limparRascunhoCompositor,
+  listarAgendadosRecorrentes,
   listarLacos,
+  listarVencendoHoje,
   ordenarLacos,
   reamarrarLaco,
   recuperarRascunhoInterrompido,
@@ -63,6 +66,8 @@ export async function recarregarCacheLacos(forcar = false): Promise<void> {
     atualizadoEmMs: agora,
   };
   emitir();
+
+  await dispararResumoDiarioSeNecessario(lista, false);
   const notificou = await verificarNotificacoesPendentes(lista);
   if (notificou) {
     const atualizados = await listarLacos();
@@ -90,6 +95,7 @@ function garantirAssinaturasGlobais(): void {
 
   if (typeof window !== 'undefined' && !timerRelogio) {
     timerRelogio = setInterval(() => {
+      emitir();
       void verificarNotificacoesPendentes(cache.lacos).then((notificou) => {
         if (notificou) void recarregarCacheLacos(true);
       });
@@ -109,18 +115,24 @@ function obterSnapshot(): EstadoCacheLacos {
   return cache;
 }
 
-export function useLacos(busca = '') {
+export function useLacos(busca = '', somenteHoje = false) {
   const estado = useSyncExternalStore(assinar, obterSnapshot, obterSnapshot);
 
-  const filtrados = filtrarPorBusca(estado.lacos, busca);
-  const ativos = ordenarLacos(filtrados, 'ativo');
+  const agoraMs = Date.now();
+  const baseFiltrada = filtrarPorBusca(estado.lacos, busca);
+  const posFiltroHoje = somenteHoje ? listarVencendoHoje(baseFiltrada) : baseFiltrada;
+
+  const ativos = ordenarLacos(posFiltroHoje, 'ativo', agoraMs);
   const ativosFixados = ativos.filter((l) => l.fixado);
   const ativosOutros = ativos.filter((l) => !l.fixado);
-  const desfeitos = ordenarLacos(filtrados, 'desfeito');
+  const agendados = listarAgendadosRecorrentes(baseFiltrada, agoraMs);
+  const desfeitos = ordenarLacos(baseFiltrada, 'desfeito', agoraMs);
 
-  const todosAtivos = estado.lacos.filter((l) => l.estado === 'ativo' && l.deletedAt === null);
-  const todosDesfeitos = estado.lacos.filter((l) => l.estado === 'desfeito' && l.deletedAt === null);
-  const quantidadeVencidos = todosAtivos.filter((l) => lacoEstaVencido(l)).length;
+  const todosAtivosVisiveis = ordenarLacos(estado.lacos, 'ativo', agoraMs);
+  const todosAgendados = listarAgendadosRecorrentes(estado.lacos, agoraMs);
+  const todosDesfeitos = ordenarLacos(estado.lacos, 'desfeito', agoraMs);
+  const vencendoHoje = listarVencendoHoje(estado.lacos);
+  const quantidadeVencidos = todosAtivosVisiveis.filter((l) => lacoEstaVencido(l, agoraMs)).length;
 
   const criar = async (input: NovoLacoInput, somAtivo: boolean) => {
     limparRascunhoCompositor();
@@ -168,9 +180,18 @@ export function useLacos(busca = '') {
     return restaurado;
   };
 
+  const trazerAgendadoParaHoje = async (id: string) => {
+    await atualizarLaco({ id, ocultoAte: null });
+    await recarregarCacheLacos(true);
+  };
+
   const excluir = async (id: string) => {
     await excluirLaco(id);
     await recarregarCacheLacos(true);
+  };
+
+  const enviarNotificacaoResumoHoje = async () => {
+    await dispararResumoDiarioSeNecessario(estado.lacos, true);
   };
 
   const dispensarAvisoDesfeito = () => {
@@ -188,9 +209,13 @@ export function useLacos(busca = '') {
     carregado: estado.carregado,
     ativosFixados,
     ativosOutros,
+    agendados,
     desfeitos,
-    totalAtivos: todosAtivos.length,
+    vencendoHoje,
+    totalAtivos: todosAtivosVisiveis.length,
+    totalAgendados: todosAgendados.length,
     totalDesfeitos: todosDesfeitos.length,
+    totalVencendoHoje: vencendoHoje.length,
     quantidadeVencidos,
     ultimoDesfeito: estado.ultimoDesfeito,
     gatilhoFocoNovo: estado.gatilhoFocoNovo,
@@ -200,7 +225,9 @@ export function useLacos(busca = '') {
     alternarItemChecklist,
     desfazer,
     reamarrar,
+    trazerAgendadoParaHoje,
     excluir,
+    enviarNotificacaoResumoHoje,
     importarImagem: lerArquivoImagem,
     dispensarAvisoDesfeito,
     solicitarFocoNovoLaco,

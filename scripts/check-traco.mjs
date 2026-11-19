@@ -27,6 +27,7 @@ function varrer(dir) {
 }
 
 varrer(path.join(ROOT, 'src'));
+varrer(path.join(ROOT, 'mcp'));
 varrer(path.join(ROOT, 'docs'));
 
 if (erros.length > 0) {

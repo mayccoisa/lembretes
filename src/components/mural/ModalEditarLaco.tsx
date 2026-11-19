@@ -1,6 +1,24 @@
 import { useRef, useState, type ClipboardEvent } from 'react';
-import { AlignLeft, Bell, CheckSquare, ImagePlus, Pin, Plus, Trash2, X } from 'lucide-react';
-import type { AtualizarLacoInput, CorFita, ItemChecklist, Laco, ModoConteudo } from '../../contracts/laco';
+import {
+  AlignLeft,
+  Bell,
+  CheckSquare,
+  ImagePlus,
+  Pin,
+  Plus,
+  Repeat,
+  Trash2,
+  X,
+} from 'lucide-react';
+import {
+  OPCOES_RECORRENCIA,
+  type AtualizarLacoInput,
+  type CorFita,
+  type ItemChecklist,
+  type Laco,
+  type ModoConteudo,
+  type RecorrenciaLaco,
+} from '../../contracts/laco';
 import { Botao } from '../ui/Botao';
 import { SeletorCorFita } from '../ui/SeletorCorFita';
 
@@ -40,6 +58,8 @@ export function ModalEditarLaco({
   const [corFita, setCorFita] = useState<CorFita>(laco.corFita);
   const [fixado, setFixado] = useState(laco.fixado);
   const [lembrarEm, setLembrarEm] = useState(paraDatetimeLocal(laco.lembrarEm));
+  const [recorrencia, setRecorrencia] = useState<RecorrenciaLaco | null>(laco.recorrencia);
+  const [intervaloRecorrencia, setIntervaloRecorrencia] = useState(laco.intervaloRecorrencia || 1);
   const [imagemUrl, setImagemUrl] = useState<string | null>(laco.imagemUrl);
   const [imagemNome, setImagemNome] = useState<string | null>(laco.imagemNome);
   const inputArquivoRef = useRef<HTMLInputElement | null>(null);
@@ -78,6 +98,8 @@ export function ModalEditarLaco({
       imagemUrl,
       imagemNome,
       lembrarEm: lembrarEm ? new Date(lembrarEm).toISOString() : null,
+      recorrencia,
+      intervaloRecorrencia,
     });
     aoFechar();
   };
@@ -231,12 +253,48 @@ export function ModalEditarLaco({
               onChange={(ev) => setLembrarEm(ev.target.value)}
               className="h-8 rounded-lg border border-border-subtle bg-panel px-2 text-xs text-ink focus:outline-none focus:border-brand"
             />
-            {lembrarEm && (
+
+            <Repeat className="ml-1 h-3.5 w-3.5 text-ink-muted" />
+            <select
+              aria-label="Frequência de repetição"
+              value={recorrencia ?? ''}
+              onChange={(ev) =>
+                setRecorrencia((ev.target.value || null) as RecorrenciaLaco | null)
+              }
+              className="h-8 rounded-lg border border-border-subtle bg-panel px-2 text-xs text-ink focus:outline-none focus:border-brand"
+            >
+              <option value="">Sem repetição</option>
+              {OPCOES_RECORRENCIA.map((op) => (
+                <option key={op.id} value={op.id}>
+                  {op.rotulo}
+                </option>
+              ))}
+            </select>
+
+            {(recorrencia === 'intervalo-horas' || recorrencia === 'intervalo-dias') && (
+              <input
+                type="number"
+                min={1}
+                max={365}
+                value={intervaloRecorrencia}
+                onChange={(ev) =>
+                  setIntervaloRecorrencia(Math.max(1, Number.parseInt(ev.target.value, 10) || 1))
+                }
+                aria-label="Intervalo da recorrência"
+                className="h-8 w-16 rounded-lg border border-border-subtle bg-panel px-2 text-xs text-ink focus:outline-none focus:border-brand"
+              />
+            )}
+
+            {(lembrarEm || recorrencia) && (
               <Botao
                 variante="fantasma"
                 apenasIcone
-                aria-label="Limpar data"
-                onClick={() => setLembrarEm('')}
+                aria-label="Limpar data e recorrência"
+                onClick={() => {
+                  setLembrarEm('');
+                  setRecorrencia(null);
+                  setIntervaloRecorrencia(1);
+                }}
               >
                 <X className="h-3.5 w-3.5" />
               </Botao>

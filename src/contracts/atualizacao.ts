@@ -1,4 +1,4 @@
-export const VERSAO_ATUAL_APP = '0.2.0';
+export const VERSAO_ATUAL_APP = '0.3.0';
 export const REPOSITORIO_GITHUB = 'mayccoisa/lembretes';
 
 export interface InfoAtualizacao {

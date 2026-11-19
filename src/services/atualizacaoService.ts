@@ -11,13 +11,10 @@ import { emAmbienteTauri } from './tauriBridge';
 
 const CHAVE_NOVIDADES_LOCAL = 'lembretes:pos-atualizacao:v1';
 
-export const NOTAS_VERSAO_ATUAL = `### Adicionado
-* Atualização automática integrada: verifica novas releases ao abrir o app ou pelo botão de sincronização no topo, baixa, instala sozinho e reinicia exibindo as melhorias.
-* Escolha de onde deixar o atalho: bolinha flutuante minimalista (lavanda, neutro ou rosa) ou apenas dentro da barra de ferramentas do Windows.
-* Auto-save estilo Google Keep: clicar fora ou apertar Esc salva automaticamente seus laços e edições.
-
-### Blindagem de dados
-* Rascunho salvo tecla a tecla com resgate automático na abertura, banco SQLite em modo WAL e histórico imutável de versões.`;
+export const NOTAS_VERSAO_ATUAL = `### Adicionado na v0.3.0
+* Servidor MCP oficial integrado (mcp/iniciar.mjs): qualquer agente de IA consegue analisar canais e criar lembretes recorrentes sem duplicar demandas ocultas.
+* Lembretes recorrentes inteligentes: suporte a repetição diária, dias úteis, semanal, mensal ou por intervalo. Ao desfazer hoje, o laço some hoje e volta sozinho no próximo ciclo.
+* Resumo de vencimentos de hoje: aviso automático no Windows, faixa de foco rápido e botão Hoje (N) no topo mostrando tudo que vence no dia.`;
 
 interface GithubReleasePayload {
   tag_name?: string;

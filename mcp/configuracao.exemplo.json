@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "lembretes": {
+      "command": "node",
+      "args": [
+        "--no-warnings",
+        "C:/proj/producthub/produtos/lembretes/mcp/iniciar.mjs"
+      ]
+    }
+  }
+}

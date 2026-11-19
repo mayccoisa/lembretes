@@ -6,7 +6,10 @@ import {
   excluirLaco,
   filtrarPorBusca,
   lacoEstaVencido,
+  listarAgendadosRecorrentes,
   listarLacos,
+  listarVencendoHoje,
+  montarTextoResumoHoje,
   ordenarLacos,
   reamarrarLaco,
   recuperarRascunhoInterrompido,
@@ -121,5 +124,31 @@ describe('lacosService · ciclo de vida completo do laco', () => {
     const segundaPassada = await recuperarRascunhoInterrompido();
     expect(segundaPassada).toBeNull();
     expect(await listarLacos()).toHaveLength(1);
+  });
+
+  it('reagenda e oculta hoje ao desfazer laco recorrente, e contabiliza vencimentos de hoje', async () => {
+    const hojeTarde = new Date();
+    hojeTarde.setHours(22, 30, 0, 0);
+
+    const rec = await criarLaco(
+      {
+        titulo: 'Checar fila comercial',
+        recorrencia: 'dias-uteis',
+        lembrarEm: hojeTarde.toISOString(),
+        chaveExterna: 'hub:fila-comercial',
+        canalOrigem: 'Product Hub',
+      },
+      false
+    );
+
+    const hojeAntes = listarVencendoHoje(await listarLacos());
+    expect(hojeAntes).toHaveLength(1);
+    expect(montarTextoResumoHoje(hojeAntes)?.titulo).toBe('1 lembrete vence hoje');
+
+    await desfazerLaco(rec.id, false);
+    const todos = await listarLacos();
+    expect(ordenarLacos(todos, 'ativo')).toHaveLength(0);
+    expect(listarAgendadosRecorrentes(todos)).toHaveLength(1);
+    expect(listarVencendoHoje(todos)).toHaveLength(0);
   });
 });

@@ -1,10 +1,11 @@
 {
   "name": "lembretes",
   "private": true,
-  "version": "0.2.0",
+  "version": "0.3.0",
   "type": "module",
-  "description": "Lembretes: mural visual rápido e dedo com lacinho flutuante no Windows",
+  "description": "Lembretes: mural visual rápido, recorrencia, notificacoes do dia e MCP local",
   "scripts": {
+    "mcp": "node --no-warnings mcp/iniciar.mjs",
     "dev": "vite --port 1420 --strictPort",
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview --port 1420 --strictPort",
@@ -19,14 +20,17 @@
     "tauri:build": "tauri build"
   },
   "dependencies": {
+    "@modelcontextprotocol/server": "2.4.0",
     "@tauri-apps/api": "^2.2.0",
     "@tauri-apps/plugin-global-shortcut": "^2.2.0",
     "@tauri-apps/plugin-notification": "^2.2.0",
     "lucide-react": "^0.475.0",
     "react": "^19.0.0",
-    "react-dom": "^19.0.0"
+    "react-dom": "^19.0.0",
+    "zod": "4.2.0"
   },
   "devDependencies": {
+    "@modelcontextprotocol/client": "2.4.0",
     "@tailwindcss/vite": "^4.0.9",
     "@tauri-apps/cli": "^2.2.0",
     "@types/node": "^22.13.0",
@@ -35,6 +39,7 @@
     "@vitejs/plugin-react": "^4.3.4",
     "jsdom": "^26.0.0",
     "tailwindcss": "^4.0.9",
+    "tsx": "^4.19.3",
     "typescript": "^5.7.3",
     "vite": "^6.2.0",
     "vitest": "^3.0.7"

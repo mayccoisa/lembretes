@@ -2,10 +2,17 @@
 
 Todas as mudanças relevantes para quem usa o **Lembretes** ficam registradas aqui.
 
+## [0.3.0] · 2026-11-19
+
+### Adicionado
+* **Servidor MCP oficial (`mcp/iniciar.mjs`):** integração direta via `stdio` para que agentes de IA entendam o produto sozinhos (`entender_lembretes`), analisem canais externos e criem ou atualizem lembretes recorrentes com proteção anti-duplicata (`chaveExterna` + `canalOrigem`) e atualização em tempo real na tela aberta.
+* **Lembretes recorrentes inteligentes:** suporte a repetição diária, seg a sex (dias úteis), semanal, mensal ou a cada `N` horas/dias. Ao desfazer um laço recorrente hoje, ele sai da visão de hoje (ficando consultável na aba **Próximos**) e retorna automaticamente para **Ativos** quando o próximo ciclo chega.
+* **Notificações de vencimentos do dia:** botão **Hoje (N)** no topo com painel dedicado, faixa de foco rápido (*Filtrar só hoje*) e notificação nativa do Windows avisando quantos lembretes vencem hoje.
+
 ## [0.2.0] · 2026-11-19
 
 ### Adicionado
-* **Atualização automática integrada:** verifica novas releases automaticamente ao abrir o app e também pelo botão de versão (`v0.2.0`) no topo. Ao encontrar nova versão, pede confirmação, baixa com barra de progresso real, instala sozinho, reinicia e exibe a modal com as melhorias da versão.
+* **Atualização automática integrada:** verifica novas releases automaticamente ao abrir o app e também pelo botão de versão no topo. Ao encontrar nova versão, pede confirmação, baixa com barra de progresso real, instala sozinho, reinicia e exibe a modal com as melhorias da versão.
 * **Escolha entre bolinha flutuante e barra de ferramentas:** novo ícone circular lavanda com traço fino monoline (`1.4px`) e seletor para manter o atalho flutuando na tela ou recolhido apenas dentro da barra de ferramentas do Windows 11.
 * **Auto-save estilo Google Keep:** digitar um laço ou editar um existente salva automaticamente ao clicar fora ou pressionar `Esc`.
 

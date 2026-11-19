@@ -13,11 +13,19 @@ import {
   ImagePlus,
   Pin,
   Plus,
+  Repeat,
   Trash2,
   X,
 } from 'lucide-react';
-import type { CorFita, ItemChecklist, ModoConteudo, NovoLacoInput } from '../../contracts/laco';
-import { lacoTemConteudoValido } from '../../contracts/laco';
+import {
+  lacoTemConteudoValido,
+  OPCOES_RECORRENCIA,
+  type CorFita,
+  type ItemChecklist,
+  type ModoConteudo,
+  type NovoLacoInput,
+  type RecorrenciaLaco,
+} from '../../contracts/laco';
 import { Botao } from '../ui/Botao';
 import { SeletorCorFita } from '../ui/SeletorCorFita';
 
@@ -53,6 +61,8 @@ export function CompositorLaco({
   const [corFita, setCorFita] = useState<CorFita>('carmim');
   const [fixado, setFixado] = useState(false);
   const [lembrarEm, setLembrarEm] = useState('');
+  const [recorrencia, setRecorrencia] = useState<RecorrenciaLaco | null>(null);
+  const [intervaloRecorrencia, setIntervaloRecorrencia] = useState(1);
   const [mostrarCampoData, setMostrarCampoData] = useState(false);
   const [imagemUrl, setImagemUrl] = useState<string | null>(null);
   const [imagemNome, setImagemNome] = useState<string | null>(null);
@@ -87,6 +97,8 @@ export function CompositorLaco({
       imagemNome,
       fixado,
       lembrarEm: dataIso,
+      recorrencia,
+      intervaloRecorrencia,
       ...parcial,
     };
   };
@@ -100,6 +112,8 @@ export function CompositorLaco({
     setCorFita('carmim');
     setFixado(false);
     setLembrarEm('');
+    setRecorrencia(null);
+    setIntervaloRecorrencia(1);
     setMostrarCampoData(false);
     setImagemUrl(null);
     setImagemNome(null);
@@ -452,15 +466,59 @@ export function CompositorLaco({
                   }}
                   className="h-8 rounded-lg border border-border-subtle bg-panel px-2 text-xs text-ink focus:outline-none focus:border-brand"
                 />
-                {lembrarEm && (
+
+                <Repeat className="ml-1 h-3.5 w-3.5 text-ink-muted" />
+                <select
+                  aria-label="Frequência de repetição"
+                  value={recorrencia ?? ''}
+                  onChange={(ev) => {
+                    const nova = (ev.target.value || null) as RecorrenciaLaco | null;
+                    setRecorrencia(nova);
+                    aoSalvarRascunho(montarRascunho({ recorrencia: nova }));
+                  }}
+                  className="h-8 rounded-lg border border-border-subtle bg-panel px-2 text-xs text-ink focus:outline-none focus:border-brand"
+                >
+                  <option value="">Sem repetição</option>
+                  {OPCOES_RECORRENCIA.map((op) => (
+                    <option key={op.id} value={op.id}>
+                      {op.rotulo}
+                    </option>
+                  ))}
+                </select>
+
+                {(recorrencia === 'intervalo-horas' || recorrencia === 'intervalo-dias') && (
+                  <input
+                    type="number"
+                    min={1}
+                    max={365}
+                    value={intervaloRecorrencia}
+                    onChange={(ev) => {
+                      const num = Math.max(1, Number.parseInt(ev.target.value, 10) || 1);
+                      setIntervaloRecorrencia(num);
+                      aoSalvarRascunho(montarRascunho({ intervaloRecorrencia: num }));
+                    }}
+                    aria-label="Intervalo da recorrência"
+                    className="h-8 w-16 rounded-lg border border-border-subtle bg-panel px-2 text-xs text-ink focus:outline-none focus:border-brand"
+                  />
+                )}
+
+                {(lembrarEm || recorrencia) && (
                   <Botao
                     variante="fantasma"
                     apenasIcone
-                    aria-label="Limpar lembrete de horário"
+                    aria-label="Limpar lembrete e recorrência"
                     onClick={() => {
                       setLembrarEm('');
+                      setRecorrencia(null);
+                      setIntervaloRecorrencia(1);
                       setMostrarCampoData(false);
-                      aoSalvarRascunho(montarRascunho({ lembrarEm: null }));
+                      aoSalvarRascunho(
+                        montarRascunho({
+                          lembrarEm: null,
+                          recorrencia: null,
+                          intervaloRecorrencia: 1,
+                        })
+                      );
                     }}
                   >
                     <X className="h-3.5 w-3.5" />
@@ -510,12 +568,12 @@ export function CompositorLaco({
                 </Botao>
 
                 <Botao
-                  variante={lembrarEm ? 'primario' : 'suave'}
+                  variante={lembrarEm || recorrencia ? 'primario' : 'suave'}
                   onClick={() => setMostrarCampoData(!mostrarCampoData)}
-                  title="Definir alerta com data e hora"
+                  title="Definir horário ou repetição automática"
                 >
                   <Bell className="h-3.5 w-3.5" />
-                  <span>Horário</span>
+                  <span>Horário / Repetir</span>
                 </Botao>
               </div>
 
