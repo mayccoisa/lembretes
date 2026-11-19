@@ -10,9 +10,12 @@ import {
   filtrarPorBusca,
   lacoEstaVencido,
   lerArquivoImagem,
+  limparRascunhoCompositor,
   listarLacos,
   ordenarLacos,
   reamarrarLaco,
+  recuperarRascunhoInterrompido,
+  salvarRascunhoCompositor,
   verificarNotificacoesPendentes,
 } from '../services/lacosService';
 
@@ -72,7 +75,9 @@ function garantirAssinaturasGlobais(): void {
   if (sincronizacaoIniciada) return;
   sincronizacaoIniciada = true;
 
-  void recarregarCacheLacos(true);
+  void recuperarRascunhoInterrompido().finally(() => {
+    void recarregarCacheLacos(true);
+  });
 
   assinarSincronizacaoExterna(() => {
     void recarregarCacheLacos(true);
@@ -118,6 +123,7 @@ export function useLacos(busca = '') {
   const quantidadeVencidos = todosAtivos.filter((l) => lacoEstaVencido(l)).length;
 
   const criar = async (input: NovoLacoInput, somAtivo: boolean) => {
+    limparRascunhoCompositor();
     const novo = await criarLaco(input, somAtivo);
     await recarregarCacheLacos(true);
     return novo;
@@ -198,6 +204,8 @@ export function useLacos(busca = '') {
     importarImagem: lerArquivoImagem,
     dispensarAvisoDesfeito,
     solicitarFocoNovoLaco,
+    salvarRascunho: salvarRascunhoCompositor,
+    limparRascunho: limparRascunhoCompositor,
     abrirMuralNativo: acoesJanela.abrirMural,
     iniciarArrasteJanela: acoesJanela.iniciarArrasteJanelaAtual,
   };

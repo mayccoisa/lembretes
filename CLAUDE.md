@@ -31,6 +31,7 @@ Valem aqui todas as regras do **Livro de Decisões Técnico** do Product Hub (`.
 3. **Altura única de controle interativo em 32px (`h-8`) (T-05 / T-19):** botões, campos e abas vêm de `src/components/ui/`.
 4. **Zero `SELECT *` (T-03):** tanto no SQLite em Rust (`src-tauri/src/db.rs`) quanto nos testes, toda consulta lista colunas explícitas.
 5. **Zero traço como conectivo (T-08):** proibido usar `—` ou ` - ` ligando orações em código, interface, testes ou documentação. Régua: `npm run check:traco`.
+6. **Zero dado em digitação preso apenas em RAM:** o compositor grava rascunho a cada tecla e salva automaticamente ao clicar fora ou pressionar `Esc` (padrão Google Keep), o modal de edição salva ao clicar fora, e o SQLite opera em `WAL` + `synchronous = FULL` com histórico imutável (`lacos_historico` via triggers) e backup automático em `backups/lembretes-ultimo.db`.
 
 ## Stack e justificativa (Passo 5 · T-04)
 
@@ -53,5 +54,5 @@ npm run tauri:build    # Gera o instalador nativo do Windows (.msi / .exe)
 
 ## Orçamento de performance (Passo 7 · T-09)
 
-* **Base medida no boot (`dist/index.html` gzipped):** **91,2 KB gzip** (`84,7 KB` JS + `6,2 KB` CSS + `0,3 KB` HTML, medido por `npm run medir:boot` em 19/11/2026).
+* **Base medida no boot (`dist/index.html` gzipped):** **96,9 KB gzip** (`90,1 KB` JS + `6,4 KB` CSS + `0,3 KB` HTML, medido por `npm run medir:boot` em 19/11/2026 na `v0.2.0`).
 * **Teto declarado:** **120 KB gzip**. Fatia que ultrapassar o teto bloqueia até ser otimizada ou ter aumento aprovado pelo dono.

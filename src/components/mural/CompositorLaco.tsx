@@ -3,6 +3,7 @@ import {
   useState,
   type ClipboardEvent,
   type DragEvent,
+  type FocusEvent,
   type KeyboardEvent,
 } from 'react';
 import {
@@ -24,6 +25,8 @@ interface CompositorLacoProps {
   gatilhoFocoNovo: number;
   aoCriar: (input: NovoLacoInput) => Promise<void>;
   aoImportarImagem: (arquivo: File) => Promise<{ url: string; nome: string }>;
+  aoSalvarRascunho: (input: NovoLacoInput) => void;
+  aoLimparRascunho: () => void;
 }
 
 function novoIdItem(): string {
@@ -36,6 +39,8 @@ export function CompositorLaco({
   gatilhoFocoNovo,
   aoCriar,
   aoImportarImagem,
+  aoSalvarRascunho,
+  aoLimparRascunho,
 }: CompositorLacoProps) {
   const [expandido, setExpandido] = useState(false);
   const [ultimoGatilho, setUltimoGatilho] = useState(gatilhoFocoNovo);
@@ -54,7 +59,9 @@ export function CompositorLaco({
   const [arrastandoArquivo, setArrastandoArquivo] = useState(false);
   const [salvando, setSalvando] = useState(false);
 
+  const containerRef = useRef<HTMLDivElement | null>(null);
   const inputArquivoRef = useRef<HTMLInputElement | null>(null);
+  const abrindoSeletorArquivoRef = useRef(false);
 
   if (gatilhoFocoNovo !== ultimoGatilho) {
     setUltimoGatilho(gatilhoFocoNovo);
@@ -63,7 +70,29 @@ export function CompositorLaco({
     }
   }
 
+  const montarRascunho = (parcial?: Partial<NovoLacoInput>): NovoLacoInput => {
+    const dataIso =
+      parcial?.lembrarEm !== undefined
+        ? parcial.lembrarEm
+        : lembrarEm
+          ? new Date(lembrarEm).toISOString()
+          : null;
+    return {
+      titulo,
+      modo,
+      texto,
+      itens,
+      corFita,
+      imagemUrl,
+      imagemNome,
+      fixado,
+      lembrarEm: dataIso,
+      ...parcial,
+    };
+  };
+
   const limparFormulario = () => {
+    aoLimparRascunho();
     setTitulo('');
     setModo('texto');
     setTexto('');
@@ -77,11 +106,32 @@ export function CompositorLaco({
     setExpandido(false);
   };
 
+  const rascunhoAtual = montarRascunho();
+  const podeSalvar = lacoTemConteudoValido(rascunhoAtual) && !salvando;
+
+  const salvarLaco = async () => {
+    if (!lacoTemConteudoValido(rascunhoAtual) || salvando) {
+      if (!lacoTemConteudoValido(rascunhoAtual)) {
+        limparFormulario();
+      }
+      return;
+    }
+    setSalvando(true);
+    try {
+      await aoCriar(rascunhoAtual);
+      limparFormulario();
+    } finally {
+      setSalvando(false);
+    }
+  };
+
   const anexarArquivo = async (arquivo: File | undefined) => {
+    abrindoSeletorArquivoRef.current = false;
     if (!arquivo || !arquivo.type.startsWith('image/')) return;
     const resultado = await aoImportarImagem(arquivo);
     setImagemUrl(resultado.url);
     setImagemNome(resultado.nome);
+    aoSalvarRascunho(montarRascunho({ imagemUrl: resultado.url, imagemNome: resultado.nome }));
     if (!expandido) setExpandido(true);
   };
 
@@ -115,12 +165,13 @@ export function CompositorLaco({
         .split('\n')
         .map((l) => l.trim())
         .filter(Boolean);
-      setItens(
+      const novosItens =
         linhas.length > 0
           ? linhas.map((l) => ({ id: novoIdItem(), texto: l, concluido: false }))
-          : [{ id: novoIdItem(), texto: '', concluido: false }]
-      );
+          : [{ id: novoIdItem(), texto: '', concluido: false }];
+      setItens(novosItens);
       setModo('checklist');
+      aoSalvarRascunho(montarRascunho({ modo: 'checklist', itens: novosItens }));
     } else {
       const juntado = itens
         .map((i) => i.texto.trim())
@@ -128,32 +179,29 @@ export function CompositorLaco({
         .join('\n');
       setTexto(juntado);
       setModo('texto');
+      aoSalvarRascunho(montarRascunho({ modo: 'texto', texto: juntado }));
     }
   };
 
-  const rascunhoAtual: NovoLacoInput = {
-    titulo,
-    modo,
-    texto,
-    itens,
-    corFita,
-    imagemUrl,
-    imagemNome,
-    fixado,
-    lembrarEm: lembrarEm ? new Date(lembrarEm).toISOString() : null,
-  };
-
-  const podeSalvar = lacoTemConteudoValido(rascunhoAtual) && !salvando;
-
-  const salvarLaco = async () => {
-    if (!podeSalvar) return;
-    setSalvando(true);
-    try {
-      await aoCriar(rascunhoAtual);
-      limparFormulario();
-    } finally {
-      setSalvando(false);
+  // Padrao Google Keep: clicar fora do compositor salva automaticamente se houver conteudo!
+  const aoPerderFocoContainer = (ev: FocusEvent<HTMLDivElement>) => {
+    if (abrindoSeletorArquivoRef.current || salvando) return;
+    const proximoAlvo = ev.relatedTarget as Node | null;
+    if (proximoAlvo && containerRef.current?.contains(proximoAlvo)) {
+      return;
     }
+    setTimeout(() => {
+      if (abrindoSeletorArquivoRef.current) return;
+      const ativoAgora = typeof document !== 'undefined' ? document.activeElement : null;
+      if (ativoAgora && containerRef.current?.contains(ativoAgora)) {
+        return;
+      }
+      if (lacoTemConteudoValido(rascunhoAtual)) {
+        void salvarLaco();
+      } else {
+        setExpandido(false);
+      }
+    }, 120);
   };
 
   const aoTeclarNoCompositor = (ev: KeyboardEvent<HTMLDivElement>) => {
@@ -161,12 +209,16 @@ export function CompositorLaco({
       ev.preventDefault();
       void salvarLaco();
     } else if (ev.key === 'Escape') {
-      limparFormulario();
+      // Padrao Google Keep: Esc fecha e salva o que foi digitado (nunca descarta!)
+      ev.preventDefault();
+      void salvarLaco();
     }
   };
 
   return (
     <div
+      ref={containerRef}
+      onBlur={aoPerderFocoContainer}
       onPaste={aoColar}
       onDragOver={(ev) => {
         ev.preventDefault();
@@ -204,7 +256,7 @@ export function CompositorLaco({
             onClick={() => setExpandido(true)}
             className="flex h-full flex-1 items-center text-left text-sm font-medium text-ink-muted hover:text-ink cursor-text"
           >
-            Amarrar um novo laço... (ou cole um print com Ctrl+V)
+            Amarrar um novo laço... (salva sozinho ao clicar fora)
           </button>
           <div className="flex items-center gap-1">
             <Botao
@@ -224,7 +276,10 @@ export function CompositorLaco({
               apenasIcone
               title="Criar laço com imagem"
               aria-label="Criar laço com imagem"
-              onClick={() => inputArquivoRef.current?.click()}
+              onClick={() => {
+                abrindoSeletorArquivoRef.current = true;
+                inputArquivoRef.current?.click();
+              }}
             >
               <ImagePlus className="h-4 w-4" />
             </Botao>
@@ -232,13 +287,11 @@ export function CompositorLaco({
         </div>
       ) : (
         <div className="flex flex-col">
-          {/* Faixa superior na cor viva da fita */}
           <div
             style={{ backgroundColor: `var(--fita-${corFita}-viva)` }}
             className="h-1.5 w-full transition-colors"
           />
 
-          {/* Pre-visualizacao da imagem anexada */}
           {imagemUrl && (
             <div className="relative border-b border-border-subtle bg-subtle/50">
               <img
@@ -255,6 +308,7 @@ export function CompositorLaco({
                   onClick={() => {
                     setImagemUrl(null);
                     setImagemNome(null);
+                    aoSalvarRascunho(montarRascunho({ imagemUrl: null, imagemNome: null }));
                   }}
                 >
                   <Trash2 className="h-3.5 w-3.5" />
@@ -264,12 +318,15 @@ export function CompositorLaco({
           )}
 
           <div className="p-4 space-y-3">
-            {/* Cabecalho com titulo opcional e botao de fixar */}
             <div className="flex items-center gap-2">
               <input
                 type="text"
                 value={titulo}
-                onChange={(ev) => setTitulo(ev.target.value)}
+                onChange={(ev) => {
+                  const v = ev.target.value;
+                  setTitulo(v);
+                  aoSalvarRascunho(montarRascunho({ titulo: v }));
+                }}
                 placeholder="Título (opcional)"
                 className="w-full bg-transparent text-sm font-semibold text-ink placeholder:text-ink-muted focus:outline-none"
               />
@@ -278,20 +335,27 @@ export function CompositorLaco({
                 apenasIcone
                 aria-label={fixado ? 'Desafixar do topo' : 'Fixar laço no topo'}
                 title={fixado ? 'Fixado no topo' : 'Fixar no topo'}
-                onClick={() => setFixado(!fixado)}
+                onClick={() => {
+                  const prox = !fixado;
+                  setFixado(prox);
+                  aoSalvarRascunho(montarRascunho({ fixado: prox }));
+                }}
               >
                 <Pin className="h-4 w-4" />
               </Botao>
             </div>
 
-            {/* Corpo: texto livre ou checklist */}
             {modo === 'texto' ? (
               <textarea
                 autoFocus
                 rows={3}
                 value={texto}
-                onChange={(ev) => setTexto(ev.target.value)}
-                placeholder="O que você não quer esquecer? (Ctrl+V cola print direto aqui)"
+                onChange={(ev) => {
+                  const v = ev.target.value;
+                  setTexto(v);
+                  aoSalvarRascunho(montarRascunho({ texto: v }));
+                }}
+                placeholder="O que você não quer esquecer? (Ctrl+V cola print · salva automático)"
                 className="w-full resize-none bg-transparent text-sm text-ink placeholder:text-ink-muted focus:outline-none leading-relaxed"
               />
             ) : (
@@ -301,26 +365,26 @@ export function CompositorLaco({
                     <input
                       type="checkbox"
                       checked={item.concluido}
-                      onChange={() =>
-                        setItens(
-                          itens.map((it) =>
-                            it.id === item.id ? { ...it, concluido: !it.concluido } : it
-                          )
-                        )
-                      }
+                      onChange={() => {
+                        const prox = itens.map((it) =>
+                          it.id === item.id ? { ...it, concluido: !it.concluido } : it
+                        );
+                        setItens(prox);
+                        aoSalvarRascunho(montarRascunho({ itens: prox }));
+                      }}
                       className="h-4 w-4 rounded accent-brand cursor-pointer"
                     />
                     <input
                       autoFocus={idx === itens.length - 1}
                       type="text"
                       value={item.texto}
-                      onChange={(ev) =>
-                        setItens(
-                          itens.map((it) =>
-                            it.id === item.id ? { ...it, texto: ev.target.value } : it
-                          )
-                        )
-                      }
+                      onChange={(ev) => {
+                        const prox = itens.map((it) =>
+                          it.id === item.id ? { ...it, texto: ev.target.value } : it
+                        );
+                        setItens(prox);
+                        aoSalvarRascunho(montarRascunho({ itens: prox }));
+                      }}
                       onKeyDown={(ev) => {
                         if (ev.key === 'Enter') {
                           ev.preventDefault();
@@ -334,7 +398,9 @@ export function CompositorLaco({
                           itens.length > 1
                         ) {
                           ev.preventDefault();
-                          setItens(itens.filter((it) => it.id !== item.id));
+                          const prox = itens.filter((it) => it.id !== item.id);
+                          setItens(prox);
+                          aoSalvarRascunho(montarRascunho({ itens: prox }));
                         }
                       }}
                       placeholder="Item da lista..."
@@ -347,7 +413,11 @@ export function CompositorLaco({
                         variante="fantasma"
                         apenasIcone
                         aria-label="Remover item"
-                        onClick={() => setItens(itens.filter((it) => it.id !== item.id))}
+                        onClick={() => {
+                          const prox = itens.filter((it) => it.id !== item.id);
+                          setItens(prox);
+                          aoSalvarRascunho(montarRascunho({ itens: prox }));
+                        }}
                       >
                         <X className="h-3.5 w-3.5" />
                       </Botao>
@@ -366,7 +436,6 @@ export function CompositorLaco({
               </div>
             )}
 
-            {/* Campo opcional de data e hora para notificacao nativa */}
             {mostrarCampoData && (
               <div className="flex flex-wrap items-center gap-2 rounded-xl border border-border-subtle bg-panel/80 px-3 py-2">
                 <Bell className="h-3.5 w-3.5 text-brand" />
@@ -374,7 +443,13 @@ export function CompositorLaco({
                 <input
                   type="datetime-local"
                   value={lembrarEm}
-                  onChange={(ev) => setLembrarEm(ev.target.value)}
+                  onChange={(ev) => {
+                    const v = ev.target.value;
+                    setLembrarEm(v);
+                    aoSalvarRascunho(
+                      montarRascunho({ lembrarEm: v ? new Date(v).toISOString() : null })
+                    );
+                  }}
                   className="h-8 rounded-lg border border-border-subtle bg-panel px-2 text-xs text-ink focus:outline-none focus:border-brand"
                 />
                 {lembrarEm && (
@@ -385,6 +460,7 @@ export function CompositorLaco({
                     onClick={() => {
                       setLembrarEm('');
                       setMostrarCampoData(false);
+                      aoSalvarRascunho(montarRascunho({ lembrarEm: null }));
                     }}
                   >
                     <X className="h-3.5 w-3.5" />
@@ -393,10 +469,15 @@ export function CompositorLaco({
               </div>
             )}
 
-            {/* Barra de ferramentas inferior */}
             <div className="flex flex-wrap items-center justify-between gap-2 pt-1 border-t border-border-subtle/70">
               <div className="flex flex-wrap items-center gap-1.5">
-                <SeletorCorFita valor={corFita} aoMudar={setCorFita} />
+                <SeletorCorFita
+                  valor={corFita}
+                  aoMudar={(novaCor) => {
+                    setCorFita(novaCor);
+                    aoSalvarRascunho(montarRascunho({ corFita: novaCor }));
+                  }}
+                />
 
                 <Botao
                   variante="suave"
@@ -418,7 +499,10 @@ export function CompositorLaco({
 
                 <Botao
                   variante="suave"
-                  onClick={() => inputArquivoRef.current?.click()}
+                  onClick={() => {
+                    abrindoSeletorArquivoRef.current = true;
+                    inputArquivoRef.current?.click();
+                  }}
                   title="Anexar imagem ou foto"
                 >
                   <ImagePlus className="h-3.5 w-3.5" />
@@ -437,7 +521,7 @@ export function CompositorLaco({
 
               <div className="flex items-center gap-1.5">
                 <Botao variante="fantasma" onClick={limparFormulario}>
-                  Cancelar
+                  Descartar
                 </Botao>
                 <Botao variante="primario" disabled={!podeSalvar} onClick={() => void salvarLaco()}>
                   Amarrar laço

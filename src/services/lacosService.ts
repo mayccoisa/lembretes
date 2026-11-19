@@ -17,22 +17,63 @@ import {
 import { tocarSomAmarrar, tocarSomDesatar } from './somFita';
 import {
   emAmbienteTauri,
+  tauriAbrirConfigBarraWindows,
   tauriAbrirMural,
-  tauriAlternarWidgetFlutuante,
   tauriAssinarFocoNovoLaco,
+  tauriAssinarModoAtalho,
   tauriAssinarMudancas,
   tauriAtualizarLaco,
   tauriCriarLaco,
+  tauriDefinirModoAtalho,
   tauriDesfazerLaco,
   tauriExcluirLaco,
   tauriIniciarArrasteJanelaAtual,
   tauriListarLacos,
+  tauriMostrarMenuWidget,
   tauriNotificarLembrete,
+  tauriObterModoAtalho,
   tauriReamarrarLaco,
   tauriSalvarImagem,
+  type ModoAtalhoWindows,
 } from './tauriBridge';
 
+export type { ModoAtalhoWindows };
+
 const CANAL_SYNC = 'lembretes-sync-canal';
+const CHAVE_RASCUNHO = 'lembretes:rascunho-ativo:v1';
+
+export function salvarRascunhoCompositor(input: NovoLacoInput): void {
+  if (typeof localStorage === 'undefined') return;
+  if (!lacoTemConteudoValido(input)) {
+    localStorage.removeItem(CHAVE_RASCUNHO);
+    return;
+  }
+  localStorage.setItem(CHAVE_RASCUNHO, JSON.stringify(input));
+}
+
+export function limparRascunhoCompositor(): void {
+  if (typeof localStorage === 'undefined') return;
+  localStorage.removeItem(CHAVE_RASCUNHO);
+}
+
+export function lerRascunhoCompositor(): NovoLacoInput | null {
+  if (typeof localStorage === 'undefined') return null;
+  const bruto = localStorage.getItem(CHAVE_RASCUNHO);
+  if (!bruto) return null;
+  try {
+    const parsed = JSON.parse(bruto) as NovoLacoInput;
+    return lacoTemConteudoValido(parsed) ? parsed : null;
+  } catch {
+    return null;
+  }
+}
+
+export async function recuperarRascunhoInterrompido(): Promise<Laco | null> {
+  const pendente = lerRascunhoCompositor();
+  if (!pendente) return null;
+  limparRascunhoCompositor();
+  return criarLaco(pendente, false);
+}
 
 function avisarOutrasAbas(): void {
   if (typeof BroadcastChannel === 'undefined') return;
@@ -186,11 +227,18 @@ export function assinarSincronizacaoExterna(aoMudar: () => void): () => void {
 export const acoesJanela = {
   emTauri: emAmbienteTauri,
   abrirMural: tauriAbrirMural,
-  alternarWidgetFlutuante: tauriAlternarWidgetFlutuante,
+  obterModoAtalho: tauriObterModoAtalho,
+  definirModoAtalho: tauriDefinirModoAtalho,
+  assinarModoAtalho: tauriAssinarModoAtalho,
+  mostrarMenuWidget: tauriMostrarMenuWidget,
+  abrirConfigBarraWindows: tauriAbrirConfigBarraWindows,
   iniciarArrasteJanelaAtual: tauriIniciarArrasteJanelaAtual,
   assinarFocoNovoLaco: tauriAssinarFocoNovoLaco,
 };
 
 export const testesInternos = {
-  resetarBancoLocal: fallbackResetarParaTeste,
+  resetarBancoLocal: (vazio = true) => {
+    limparRascunhoCompositor();
+    fallbackResetarParaTeste(vazio);
+  },
 };

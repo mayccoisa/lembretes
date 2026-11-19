@@ -1,7 +1,7 @@
 {
   "name": "lembretes",
   "private": true,
-  "version": "0.1.0",
+  "version": "0.2.0",
   "type": "module",
   "description": "Lembretes: mural visual rápido e dedo com lacinho flutuante no Windows",
   "scripts": {

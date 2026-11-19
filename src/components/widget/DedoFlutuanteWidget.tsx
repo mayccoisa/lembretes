@@ -1,27 +1,33 @@
-import { useRef, useState, type PointerEvent } from 'react';
+import { useRef, useState, type MouseEvent, type PointerEvent } from 'react';
+import type { TomBotaoAtalho } from '../../hooks/usePreferencias';
 import { IconeLacinhoDiscreto } from '../arte/IconeLacinhoDiscreto';
 
 interface DedoFlutuanteWidgetProps {
   modoJanelaNativa: boolean;
+  tom: TomBotaoAtalho;
   totalAtivos: number;
   quantidadeVencidos: number;
   posicaoPreview?: { x: number; y: number };
   aoMoverPreview?: (x: number, y: number) => void;
   aoAbrirLembrancas: () => void;
+  aoMenuContexto?: () => void;
   aoIniciarArrasteNativo: () => Promise<void>;
 }
 
 /**
- * Atalho flutuante discreto no Windows: apenas um lacinho leve e pequeno,
- * sem caixa de fundo nem poluicao visual, que flutua pela tela e abre as lembrancas ao clicar.
+ * Botao circular minimalista monoline (38x38px):
+ * circulo suave plano com lacinho geometrico de linha fina no centro.
+ * Clique esquerdo abre/recolhe as lembrancas; arrastar move; clique direito abre opcoes (enviar para barra).
  */
 export function DedoFlutuanteWidget({
   modoJanelaNativa,
+  tom,
   totalAtivos,
   quantidadeVencidos,
   posicaoPreview = { x: 24, y: 120 },
   aoMoverPreview,
   aoAbrirLembrancas,
+  aoMenuContexto,
   aoIniciarArrasteNativo,
 }: DedoFlutuanteWidgetProps) {
   const [arrastando, setArrastando] = useState(false);
@@ -34,6 +40,7 @@ export function DedoFlutuanteWidget({
   const virouArrasteRef = useRef(false);
 
   const aoPressionar = (ev: PointerEvent<HTMLDivElement>) => {
+    if (ev.button !== 0) return;
     virouArrasteRef.current = false;
     pontoInicialRef.current = {
       clientX: ev.clientX,
@@ -65,15 +72,16 @@ export function DedoFlutuanteWidget({
     }
 
     if (virouArrasteRef.current && !modoJanelaNativa && aoMoverPreview) {
-      const maxX = Math.max(12, window.innerWidth - 52);
-      const maxY = Math.max(12, window.innerHeight - 52);
+      const maxX = Math.max(12, window.innerWidth - 48);
+      const maxY = Math.max(12, window.innerHeight - 48);
       const novoX = Math.min(maxX, Math.max(8, ini.origX + dx));
       const novoY = Math.min(maxY, Math.max(8, ini.origY + dy));
       aoMoverPreview(novoX, novoY);
     }
   };
 
-  const aoSoltar = () => {
+  const aoSoltar = (ev: PointerEvent<HTMLDivElement>) => {
+    if (ev.button !== 0) return;
     const eraArraste = virouArrasteRef.current;
     pontoInicialRef.current = null;
     virouArrasteRef.current = false;
@@ -84,17 +92,25 @@ export function DedoFlutuanteWidget({
     }
   };
 
+  const aoClicarDireito = (ev: MouseEvent<HTMLDivElement>) => {
+    ev.preventDefault();
+    if (aoMenuContexto) {
+      aoMenuContexto();
+    }
+  };
+
   const temAlerta = quantidadeVencidos > 0;
   const dica =
     totalAtivos > 0
-      ? `Lembretes (${totalAtivos} ativos) · Clique para abrir ou arraste`
-      : 'Lembretes · Clique para abrir ou arraste';
+      ? `Lembretes (${totalAtivos} ativos) · Clique para abrir, arraste ou clique com o direito`
+      : 'Lembretes · Clique para abrir, arraste ou clique com o direito';
 
-  const lacinho = (
+  const circulo = (
     <div
       onPointerDown={aoPressionar}
       onPointerMove={aoMover}
       onPointerUp={aoSoltar}
+      onContextMenu={aoClicarDireito}
       role="button"
       tabIndex={0}
       onKeyDown={(ev) => {
@@ -106,18 +122,17 @@ export function DedoFlutuanteWidget({
       aria-label={dica}
       title={dica}
       style={{
-        filter: 'drop-shadow(0 2px 5px rgba(0, 0, 0, 0.22))',
+        backgroundColor: `var(--atalho-${tom}-bg)`,
       }}
-      className={`group flex h-10 w-10 items-center justify-center rounded-full bg-transparent transition-all duration-200 select-none ${
+      className={`flex h-9.5 w-9.5 items-center justify-center rounded-full transition-all duration-150 select-none ${
         arrastando
-          ? 'scale-110 opacity-100 cursor-grabbing'
-          : 'opacity-75 hover:opacity-100 hover:scale-110 cursor-grab'
+          ? 'scale-105 opacity-100 cursor-grabbing'
+          : 'opacity-90 hover:opacity-100 hover:scale-105 cursor-grab'
       }`}
     >
       <IconeLacinhoDiscreto
-        tamanho={30}
-        corFita={temAlerta ? 'ambar' : 'carmim'}
-        animarFita
+        tamanho={18}
+        corTracoCss={`var(--atalho-${tom}-traco)`}
         alertaAtivo={temAlerta}
       />
     </div>
@@ -126,7 +141,7 @@ export function DedoFlutuanteWidget({
   if (modoJanelaNativa) {
     return (
       <div className="flex h-screen w-screen items-center justify-center bg-transparent overflow-hidden">
-        {lacinho}
+        {circulo}
       </div>
     );
   }
@@ -139,7 +154,7 @@ export function DedoFlutuanteWidget({
       }}
       className="fixed z-40"
     >
-      {lacinho}
+      {circulo}
     </div>
   );
 }

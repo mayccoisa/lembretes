@@ -59,6 +59,14 @@
   --dedo-unha: #ffe6d6;
   --dedo-contorno: #6c4632;
 
+  /* Botao circular minimalista do atalho flutuante (inspirado em icones monoline suaves) */
+  --atalho-lavanda-bg: #c3cefb;
+  --atalho-lavanda-traco: #27325c;
+  --atalho-neutro-bg: #eae6df;
+  --atalho-neutro-traco: #2b2622;
+  --atalho-carmim-bg: #ffd9df;
+  --atalho-carmim-traco: #7a182b;
+
   /* 6 Cores semanticas das fitas dos lacos (claro) */
   --fita-carmim-bg: #fff7f7;
   --fita-carmim-borda: #f8cfd4;
@@ -124,6 +132,13 @@
   --dedo-sombra: #d4986f;
   --dedo-unha: #fadbc7;
   --dedo-contorno: #4d2f20;
+
+  --atalho-lavanda-bg: #b8c5fa;
+  --atalho-lavanda-traco: #1f294d;
+  --atalho-neutro-bg: #352f2b;
+  --atalho-neutro-traco: #f2ece6;
+  --atalho-carmim-bg: #4a2229;
+  --atalho-carmim-traco: #ffbbc6;
 
   /* 6 Cores semanticas das fitas dos lacos (escuro) */
   --fita-carmim-bg: #291c1e;

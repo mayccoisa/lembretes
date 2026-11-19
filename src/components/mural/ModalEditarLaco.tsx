@@ -84,7 +84,13 @@ export function ModalEditarLaco({
 
   return (
     <div
-      onClick={aoFechar}
+      onClick={() => void salvarFechar()}
+      onKeyDown={(ev) => {
+        if (ev.key === 'Escape') {
+          ev.preventDefault();
+          void salvarFechar();
+        }
+      }}
       className="fixed inset-0 z-50 flex items-center justify-center bg-overlay p-4 backdrop-blur-xs"
       role="dialog"
       aria-modal="true"
@@ -264,7 +270,7 @@ export function ModalEditarLaco({
 
             <div className="flex items-center gap-1.5">
               <Botao variante="fantasma" onClick={aoFechar}>
-                Cancelar
+                Descartar
               </Botao>
               <Botao variante="primario" onClick={() => void salvarFechar()}>
                 Salvar laço

@@ -1,15 +1,20 @@
 import { useSyncExternalStore } from 'react';
-import { acoesJanela } from '../services/lacosService';
+import { acoesJanela, type ModoAtalhoWindows } from '../services/lacosService';
+
+export type TomBotaoAtalho = 'lavanda' | 'neutro' | 'carmim';
 
 export interface PreferenciasApp {
   tema: 'claro' | 'escuro';
   somAtivo: boolean;
-  widgetVisivel: boolean;
+  modoAtalho: ModoAtalhoWindows;
+  tomAtalho: TomBotaoAtalho;
   posicaoWidgetPreview: { x: number; y: number };
 }
 
-const CHAVE_PREFS = 'lembretes:preferencias:v1';
+const CHAVE_PREFS = 'lembretes:preferencias:v2';
+const CANAL_PREFS = 'lembretes-prefs-sync';
 const ouvintes = new Set<() => void>();
+let sincronizadoComTauri = false;
 
 function lerInicial(): PreferenciasApp {
   const padraoEscuro =
@@ -20,7 +25,8 @@ function lerInicial(): PreferenciasApp {
   const base: PreferenciasApp = {
     tema: padraoEscuro ? 'escuro' : 'claro',
     somAtivo: true,
-    widgetVisivel: true,
+    modoAtalho: 'flutuante',
+    tomAtalho: 'lavanda',
     posicaoWidgetPreview: { x: 24, y: 120 },
   };
 
@@ -43,16 +49,57 @@ function aplicarClasseTema(tema: 'claro' | 'escuro'): void {
 
 aplicarClasseTema(estadoPrefs.tema);
 
-function salvarNotificar(proximo: PreferenciasApp): void {
+function salvarNotificar(proximo: PreferenciasApp, propagarOutrasJanelas = true): void {
   estadoPrefs = proximo;
   aplicarClasseTema(proximo.tema);
   if (typeof localStorage !== 'undefined') {
     localStorage.setItem(CHAVE_PREFS, JSON.stringify(proximo));
   }
+  if (propagarOutrasJanelas && typeof BroadcastChannel !== 'undefined') {
+    const canal = new BroadcastChannel(CANAL_PREFS);
+    canal.postMessage(proximo);
+    canal.close();
+  }
   for (const fn of ouvintes) fn();
 }
 
+function garantirSincroniaPrefs(): void {
+  if (sincronizadoComTauri) return;
+  sincronizadoComTauri = true;
+
+  if (acoesJanela.emTauri()) {
+    void acoesJanela.obterModoAtalho().then((modoNativo) => {
+      if (modoNativo !== estadoPrefs.modoAtalho) {
+        salvarNotificar({ ...estadoPrefs, modoAtalho: modoNativo }, false);
+      }
+    });
+    void acoesJanela.assinarModoAtalho((novoModo) => {
+      salvarNotificar({ ...estadoPrefs, modoAtalho: novoModo }, false);
+    });
+  }
+
+  if (typeof BroadcastChannel !== 'undefined') {
+    const canal = new BroadcastChannel(CANAL_PREFS);
+    canal.onmessage = (ev: MessageEvent<PreferenciasApp>) => {
+      if (ev.data) salvarNotificar(ev.data, false);
+    };
+  }
+
+  if (typeof window !== 'undefined') {
+    window.addEventListener('storage', (ev) => {
+      if (ev.key === CHAVE_PREFS && ev.newValue) {
+        try {
+          salvarNotificar(JSON.parse(ev.newValue) as PreferenciasApp, false);
+        } catch {
+          // ignora json invalido
+        }
+      }
+    });
+  }
+}
+
 function assinar(ouvinte: () => void): () => void {
+  garantirSincroniaPrefs();
   ouvintes.add(ouvinte);
   return () => ouvintes.delete(ouvinte);
 }
@@ -78,13 +125,17 @@ export function usePreferencias() {
     });
   };
 
-  const alternarWidget = async () => {
+  const escolherModoAtalho = async (modo: ModoAtalhoWindows) => {
     if (acoesJanela.emTauri()) {
-      const visivel = await acoesJanela.alternarWidgetFlutuante();
-      salvarNotificar({ ...estadoPrefs, widgetVisivel: visivel });
+      const confirmado = await acoesJanela.definirModoAtalho(modo);
+      salvarNotificar({ ...estadoPrefs, modoAtalho: confirmado });
       return;
     }
-    salvarNotificar({ ...estadoPrefs, widgetVisivel: !estadoPrefs.widgetVisivel });
+    salvarNotificar({ ...estadoPrefs, modoAtalho: modo });
+  };
+
+  const escolherTomAtalho = (tomAtalho: TomBotaoAtalho) => {
+    salvarNotificar({ ...estadoPrefs, tomAtalho });
   };
 
   const moverWidgetPreview = (x: number, y: number) => {
@@ -99,7 +150,10 @@ export function usePreferencias() {
     emTauri: acoesJanela.emTauri(),
     alternarTema,
     alternarSom,
-    alternarWidget,
+    escolherModoAtalho,
+    escolherTomAtalho,
     moverWidgetPreview,
+    mostrarMenuWidgetNativo: acoesJanela.mostrarMenuWidget,
+    abrirConfigBarraWindows: acoesJanela.abrirConfigBarraWindows,
   };
 }

@@ -3,90 +3,81 @@ import type { CorFita } from '../../contracts/laco';
 interface IconeLacinhoDiscretoProps {
   tamanho?: number;
   corFita?: CorFita;
-  animarFita?: boolean;
+  corTracoCss?: string;
   alertaAtivo?: boolean;
   className?: string;
 }
 
 /**
- * Ilustracao vetorial minimalista, leve e delicada de apenas um lacinho de fita.
- * Traco fino e organico, sem fundo pesado e sem dedo, pensado para ficar super discreto.
+ * Icone monoline geometrico fino (traco 1.4px sem preenchimento),
+ * no mesmo peso visual dos botoes circulares de sistema da referencia.
  * Consome apenas variaveis semanticas de src/theme/tokens.css (T-21).
  */
 export function IconeLacinhoDiscreto({
-  tamanho = 28,
+  tamanho = 18,
   corFita = 'carmim',
-  animarFita = false,
+  corTracoCss,
   alertaAtivo = false,
   className = '',
 }: IconeLacinhoDiscretoProps) {
-  const corViva = `var(--fita-${corFita}-viva)`;
-  const corNo = `var(--fita-${corFita}-no)`;
+  const traco = corTracoCss ?? `var(--fita-${corFita}-viva)`;
 
   return (
     <svg
       width={tamanho}
       height={tamanho}
-      viewBox="0 0 48 48"
+      viewBox="0 0 24 24"
       fill="none"
       xmlns="http://www.w3.org/2000/svg"
       className={className}
       aria-hidden="true"
     >
-      <g className={animarFita ? 'animar-balanco-fita' : ''}>
-        {/* Orelha esquerda leve e vazada com preenchimento suave */}
-        <path
-          d="M22.5 22.5C17.2 14.2 6.5 14.8 7 22.2C7.4 29.2 17.5 27.6 22.5 23.2"
-          fill={corViva}
-          fillOpacity="0.18"
-          stroke={corViva}
-          strokeWidth="2"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        />
+      {/* Laco esquerdo simetrico em linha fina */}
+      <path
+        d="M10.2 10.6C7.5 7.2 3.4 8.2 3.4 11.4C3.4 14.6 7.5 15.6 10.2 12.2"
+        stroke={traco}
+        strokeWidth="1.4"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
 
-        {/* Orelha direita leve e vazada com preenchimento suave */}
-        <path
-          d="M25.5 22.5C30.8 14.2 41.5 14.8 41 22.2C40.6 29.2 30.5 27.6 25.5 23.2"
-          fill={corViva}
-          fillOpacity="0.18"
-          stroke={corViva}
-          strokeWidth="2"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        />
+      {/* Laco direito simetrico em linha fina */}
+      <path
+        d="M13.8 10.6C16.5 7.2 20.6 8.2 20.6 11.4C20.6 14.6 16.5 15.6 13.8 12.2"
+        stroke={traco}
+        strokeWidth="1.4"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
 
-        {/* Fitas finas caindo suavemente */}
-        <path
-          d="M22.8 24.5C20.5 29.5 17.2 33.8 14.5 37.5"
-          stroke={corViva}
-          strokeWidth="1.9"
-          strokeLinecap="round"
-        />
-        <path
-          d="M25.2 24.5C27.5 29.5 30.8 33.8 33.5 37.5"
-          stroke={corViva}
-          strokeWidth="1.9"
-          strokeLinecap="round"
-        />
+      {/* Duas perninhas finas e retas */}
+      <path
+        d="M10.8 13.2L7.8 18.8"
+        stroke={traco}
+        strokeWidth="1.4"
+        strokeLinecap="round"
+      />
+      <path
+        d="M13.2 13.2L16.2 18.8"
+        stroke={traco}
+        strokeWidth="1.4"
+        strokeLinecap="round"
+      />
 
-        {/* No central pequeno e delicado */}
-        <circle
-          cx="24"
-          cy="22.8"
-          r="3.2"
-          fill={corViva}
-          stroke={corNo}
-          strokeWidth="1.4"
-        />
-      </g>
+      {/* No central fino */}
+      <circle
+        cx="12"
+        cy="11.4"
+        r="1.95"
+        stroke={traco}
+        strokeWidth="1.4"
+      />
 
-      {/* Pontinho minimo apenas quando existe lembrete vencido */}
       {alertaAtivo && (
         <circle
-          cx="37"
-          cy="12"
-          r="3.5"
+          cx="19.5"
+          cy="5.5"
+          r="2.1"
           fill="var(--brand-primary)"
           className="animar-pulso-lembrete"
         />

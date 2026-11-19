@@ -77,6 +77,7 @@ pub struct AtualizarLacoInput {
 
 pub fn abrir_banco(caminho: &Path) -> Result<Connection, String> {
     let conn = Connection::open(caminho).map_err(|e| format!("Falha ao abrir SQLite: {e}"))?;
+    let _ = conn.execute_batch("PRAGMA journal_mode = WAL; PRAGMA synchronous = FULL;");
     migrar(&conn)?;
     Ok(conn)
 }
@@ -111,6 +112,64 @@ fn migrar(conn: &Connection) -> Result<(), String> {
             PRAGMA user_version = 1;",
         )
         .map_err(|e| format!("Falha na migracao 001: {e}"))?;
+    }
+
+    if versao < 2 {
+        conn.execute_batch(
+            "CREATE TABLE IF NOT EXISTS lacos_historico (
+                seq INTEGER PRIMARY KEY AUTOINCREMENT,
+                operacao TEXT NOT NULL,
+                laco_id TEXT NOT NULL,
+                titulo TEXT NOT NULL,
+                modo TEXT NOT NULL,
+                texto TEXT NOT NULL,
+                itens_json TEXT NOT NULL,
+                cor_fita TEXT NOT NULL,
+                imagem_url TEXT,
+                imagem_nome TEXT,
+                estado TEXT NOT NULL,
+                registrado_em TEXT NOT NULL DEFAULT (datetime('now'))
+            );
+
+            CREATE TRIGGER IF NOT EXISTS trg_lacos_hist_insert
+            AFTER INSERT ON lacos
+            BEGIN
+                INSERT INTO lacos_historico (
+                    operacao, laco_id, titulo, modo, texto, itens_json,
+                    cor_fita, imagem_url, imagem_nome, estado
+                ) VALUES (
+                    'INSERT', NEW.id, NEW.titulo, NEW.modo, NEW.texto, NEW.itens_json,
+                    NEW.cor_fita, NEW.imagem_url, NEW.imagem_nome, NEW.estado
+                );
+            END;
+
+            CREATE TRIGGER IF NOT EXISTS trg_lacos_hist_update
+            AFTER UPDATE ON lacos
+            BEGIN
+                INSERT INTO lacos_historico (
+                    operacao, laco_id, titulo, modo, texto, itens_json,
+                    cor_fita, imagem_url, imagem_nome, estado
+                ) VALUES (
+                    'UPDATE', NEW.id, NEW.titulo, NEW.modo, NEW.texto, NEW.itens_json,
+                    NEW.cor_fita, NEW.imagem_url, NEW.imagem_nome, NEW.estado
+                );
+            END;
+
+            CREATE TRIGGER IF NOT EXISTS trg_lacos_hist_delete
+            AFTER DELETE ON lacos
+            BEGIN
+                INSERT INTO lacos_historico (
+                    operacao, laco_id, titulo, modo, texto, itens_json,
+                    cor_fita, imagem_url, imagem_nome, estado
+                ) VALUES (
+                    'DELETE', OLD.id, OLD.titulo, OLD.modo, OLD.texto, OLD.itens_json,
+                    OLD.cor_fita, OLD.imagem_url, OLD.imagem_nome, OLD.estado
+                );
+            END;
+
+            PRAGMA user_version = 2;",
+        )
+        .map_err(|e| format!("Falha na migracao 002 (historico imutavel): {e}"))?;
     }
     Ok(())
 }
@@ -379,5 +438,14 @@ mod tests {
         excluir_laco(&conn, &criado.id).expect("excluir");
         let restantes = listar_lacos(&conn).expect("listar");
         assert_eq!(restantes.len(), 0);
+
+        let total_hist: i64 = conn
+            .query_row(
+                "SELECT COUNT(seq) FROM lacos_historico WHERE laco_id = ?1",
+                params![criado.id],
+                |r| r.get(0),
+            )
+            .expect("contar historico");
+        assert!(total_hist >= 4);
     }
 }

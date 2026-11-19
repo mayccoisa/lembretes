@@ -1,5 +1,7 @@
 import type { AtualizarLacoInput, Laco, NovoLacoInput } from '../contracts/laco';
 
+export type ModoAtalhoWindows = 'flutuante' | 'barra';
+
 export function emAmbienteTauri(): boolean {
   return typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window;
 }
@@ -50,10 +52,30 @@ export async function tauriAbrirMural(focarNovoLaco = false): Promise<void> {
   await invoke('abrir_mural', { focarNovoLaco });
 }
 
-export async function tauriAlternarWidgetFlutuante(): Promise<boolean> {
-  if (!emAmbienteTauri()) return true;
+export async function tauriObterModoAtalho(): Promise<ModoAtalhoWindows> {
+  if (!emAmbienteTauri()) return 'flutuante';
   const { invoke } = await import('@tauri-apps/api/core');
-  return invoke<boolean>('alternar_widget_flutuante');
+  return invoke<ModoAtalhoWindows>('obter_modo_atalho');
+}
+
+export async function tauriDefinirModoAtalho(
+  modo: ModoAtalhoWindows
+): Promise<ModoAtalhoWindows> {
+  if (!emAmbienteTauri()) return modo;
+  const { invoke } = await import('@tauri-apps/api/core');
+  return invoke<ModoAtalhoWindows>('definir_modo_atalho', { modo });
+}
+
+export async function tauriMostrarMenuWidget(): Promise<void> {
+  if (!emAmbienteTauri()) return;
+  const { invoke } = await import('@tauri-apps/api/core');
+  await invoke('mostrar_menu_widget');
+}
+
+export async function tauriAbrirConfigBarraWindows(): Promise<void> {
+  if (!emAmbienteTauri()) return;
+  const { invoke } = await import('@tauri-apps/api/core');
+  await invoke('abrir_config_barra_windows');
 }
 
 export async function tauriIniciarArrasteJanelaAtual(): Promise<void> {
@@ -101,6 +123,19 @@ export async function tauriAssinarMudancas(aoMudar: () => void): Promise<() => v
   });
   return () => {
     unlistenMudou();
+  };
+}
+
+export async function tauriAssinarModoAtalho(
+  aoMudarModo: (modo: ModoAtalhoWindows) => void
+): Promise<() => void> {
+  if (!emAmbienteTauri()) return () => {};
+  const { listen } = await import('@tauri-apps/api/event');
+  const unlisten = await listen<ModoAtalhoWindows>('atalho:mudou', (ev) => {
+    aoMudarModo(ev.payload);
+  });
+  return () => {
+    unlisten();
   };
 }
 

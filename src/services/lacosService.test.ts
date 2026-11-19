@@ -9,6 +9,8 @@ import {
   listarLacos,
   ordenarLacos,
   reamarrarLaco,
+  recuperarRascunhoInterrompido,
+  salvarRascunhoCompositor,
   testesInternos,
 } from './lacosService';
 
@@ -97,5 +99,27 @@ describe('lacosService · ciclo de vida completo do laco', () => {
 
     await excluirLaco(laco.id);
     expect(await listarLacos()).toHaveLength(0);
+  });
+
+  it('resgata automaticamente no boot um rascunho digitado cujo processo foi fechado antes de clicar em salvar', async () => {
+    salvarRascunhoCompositor({
+      titulo: 'Ideia urgente',
+      modo: 'texto',
+      texto: 'Nao esquecer de revisar o layout da home',
+      corFita: 'lavanda',
+    });
+
+    const resgatado = await recuperarRascunhoInterrompido();
+    expect(resgatado).not.toBeNull();
+    expect(resgatado?.titulo).toBe('Ideia urgente');
+
+    const ativos = ordenarLacos(await listarLacos(), 'ativo');
+    expect(ativos).toHaveLength(1);
+    expect(ativos[0].texto).toBe('Nao esquecer de revisar o layout da home');
+
+    // Segunda chamada deve ser idempotente (nao duplicar o resgate)
+    const segundaPassada = await recuperarRascunhoInterrompido();
+    expect(segundaPassada).toBeNull();
+    expect(await listarLacos()).toHaveLength(1);
   });
 });

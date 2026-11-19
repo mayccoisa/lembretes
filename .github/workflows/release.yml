@@ -1,0 +1,77 @@
+name: Publicar Release Windows
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  release-windows:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout do codigo
+        uses: actions/checkout@v4
+
+      - name: Configurar Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Configurar Rust estavel
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache do Cargo
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+
+      - name: Instalar dependencias e validar regua completa
+        run: |
+          npm ci
+          npm run check
+
+      - name: Compilar executavel nativo Lembretes (Windows x64)
+        run: npx tauri build --no-bundle
+
+      - name: Extrair notas da versao do CHANGELOG.md
+        id: notas
+        shell: pwsh
+        run: |
+          $tag = "${{ github.ref_name }}".TrimStart('v')
+          $linhas = Get-Content CHANGELOG.md
+          $capturando = $false
+          $bloco = @()
+          foreach ($l in $linhas) {
+            if ($l -match "^## \[$([regex]::Escape($tag))\]") {
+              $capturando = $true
+              continue
+            }
+            if ($capturando -and $l -match "^## \[") {
+              break
+            }
+            if ($capturando) {
+              $bloco += $l
+            }
+          }
+          $texto = ($bloco -join "`n").Trim()
+          if (-not $texto) { $texto = "Melhorias e correcoes da versao v$tag." }
+          Set-Content -Path release-notes.md -Value $texto -Encoding UTF8
+
+      - name: Publicar GitHub Release com lembretes.exe
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        shell: pwsh
+        run: |
+          $tag = "${{ github.ref_name }}"
+          $exe = "src-tauri/target/release/lembretes.exe"
+          if (gh release view $tag 2>$null) {
+            gh release upload $tag $exe --clobber
+            gh release edit $tag --notes-file release-notes.md
+          } else {
+            gh release create $tag $exe --title "Lembretes $tag" --notes-file release-notes.md
+          }

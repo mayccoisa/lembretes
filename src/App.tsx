@@ -1,7 +1,9 @@
 import { useState } from 'react';
 import {
   Moon,
+  RefreshCw,
   Search,
+  SlidersHorizontal,
   Sparkles,
   Sun,
   Volume2,
@@ -13,12 +15,16 @@ import { IconeLacinhoDiscreto } from './components/arte/IconeLacinhoDiscreto';
 import { BarraDesfazerToast } from './components/mural/BarraDesfazerToast';
 import { CartaoLaco } from './components/mural/CartaoLaco';
 import { CompositorLaco } from './components/mural/CompositorLaco';
+import { ModalConfigAtalho } from './components/mural/ModalConfigAtalho';
+import { ModalConfirmarAtualizacao } from './components/mural/ModalConfirmarAtualizacao';
 import { ModalEditarLaco } from './components/mural/ModalEditarLaco';
 import { ModalImagem } from './components/mural/ModalImagem';
+import { ModalMelhoriasVersao } from './components/mural/ModalMelhoriasVersao';
 import { AlternadorAba } from './components/ui/AlternadorAba';
 import { Botao } from './components/ui/Botao';
 import { CampoTexto } from './components/ui/CampoTexto';
 import { DedoFlutuanteWidget } from './components/widget/DedoFlutuanteWidget';
+import { useAtualizacao } from './hooks/useAtualizacao';
 import { useLacos } from './hooks/useLacos';
 import { usePreferencias } from './hooks/usePreferencias';
 
@@ -52,18 +58,21 @@ export function App() {
   const [imagemAmpliada, setImagemAmpliada] = useState<{ url: string; titulo: string } | null>(
     null
   );
-  const [simularWidgetNoNavegador, setSimularWidgetNoNavegador] = useState(false);
+  const [modalAtalhoAberto, setModalAtalhoAberto] = useState(false);
 
   const prefs = usePreferencias();
   const lacos = useLacos(busca);
+  const atualizacao = useAtualizacao(!modoJanelaWidget);
 
   if (modoJanelaWidget) {
     return (
       <DedoFlutuanteWidget
         modoJanelaNativa
+        tom={prefs.tomAtalho}
         totalAtivos={lacos.totalAtivos}
         quantidadeVencidos={lacos.quantidadeVencidos}
         aoAbrirLembrancas={() => void lacos.abrirMuralNativo(false)}
+        aoMenuContexto={() => void prefs.mostrarMenuWidgetNativo()}
         aoIniciarArrasteNativo={lacos.iniciarArrasteJanela}
       />
     );
@@ -74,15 +83,17 @@ export function App() {
 
   return (
     <div className="min-h-screen bg-canvas text-ink transition-colors">
-      {/* No navegador puro, so exibe simulacao se o usuario ligar manualmente */}
-      {!prefs.emTauri && simularWidgetNoNavegador && (
+      {/* Simulacao no navegador quando fora do Tauri */}
+      {!prefs.emTauri && prefs.modoAtalho === 'flutuante' && (
         <DedoFlutuanteWidget
           modoJanelaNativa={false}
+          tom={prefs.tomAtalho}
           totalAtivos={lacos.totalAtivos}
           quantidadeVencidos={lacos.quantidadeVencidos}
           posicaoPreview={prefs.posicaoWidgetPreview}
           aoMoverPreview={prefs.moverWidgetPreview}
           aoAbrirLembrancas={() => setAba('ativo')}
+          aoMenuContexto={() => setModalAtalhoAberto(true)}
           aoIniciarArrasteNativo={lacos.iniciarArrasteJanela}
         />
       )}
@@ -90,9 +101,17 @@ export function App() {
       {/* Barra superior fixa estilo Google Keep */}
       <header className="sticky top-0 z-30 border-b border-border-subtle bg-canvas/90 backdrop-blur-md">
         <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-3 px-4 py-3">
-          {/* Marca com apenas um lacinho discreto */}
-          <div className="flex items-center gap-2">
-            <IconeLacinhoDiscreto tamanho={26} />
+          {/* Marca no estilo circular monoline */}
+          <div className="flex items-center gap-2.5">
+            <span
+              style={{ backgroundColor: `var(--atalho-${prefs.tomAtalho}-bg)` }}
+              className="inline-flex h-8 w-8 items-center justify-center rounded-full shrink-0"
+            >
+              <IconeLacinhoDiscreto
+                tamanho={16}
+                corTracoCss={`var(--atalho-${prefs.tomAtalho}-traco)`}
+              />
+            </span>
             <div>
               <h1 className="text-sm font-bold tracking-tight text-ink leading-tight">Lembretes</h1>
               <p className="text-[11px] text-ink-muted leading-tight">
@@ -135,25 +154,28 @@ export function App() {
               ]}
             />
 
-            {prefs.emTauri ? (
-              <Botao
-                variante={prefs.widgetVisivel ? 'primario' : 'suave'}
-                onClick={() => void prefs.alternarWidget()}
-                title="Mostrar ou ocultar o lacinho flutuante na tela do Windows"
-              >
-                <Sparkles className="h-3.5 w-3.5" />
-                <span>Lacinho flutuante</span>
-              </Botao>
-            ) : (
-              <Botao
-                variante={simularWidgetNoNavegador ? 'primario' : 'suave'}
-                onClick={() => setSimularWidgetNoNavegador(!simularWidgetNoNavegador)}
-                title="Testar o lacinho flutuante no navegador"
-              >
-                <Sparkles className="h-3.5 w-3.5" />
-                <span>Lacinho flutuante</span>
-              </Botao>
-            )}
+            <Botao
+              variante="suave"
+              onClick={atualizacao.verificarAgora}
+              disabled={atualizacao.verificando || atualizacao.instalando}
+              title={`Versão atual v${atualizacao.versaoAtual} · Clique para procurar nova release`}
+            >
+              <RefreshCw
+                className={`h-3.5 w-3.5 ${atualizacao.verificando ? 'animate-spin' : ''}`}
+              />
+              <span>v{atualizacao.versaoAtual}</span>
+            </Botao>
+
+            <Botao
+              variante="suave"
+              onClick={() => setModalAtalhoAberto(true)}
+              title="Escolher entre bolinha flutuante ou ícone na barra de ferramentas"
+            >
+              <SlidersHorizontal className="h-3.5 w-3.5" />
+              <span>
+                {prefs.modoAtalho === 'barra' ? 'Atalho: na barra' : 'Atalho: flutuante'}
+              </span>
+            </Botao>
 
             <Botao
               variante="suave"
@@ -190,15 +212,17 @@ export function App() {
 
       {/* Conteudo principal */}
       <main className="mx-auto max-w-6xl px-4 py-6 space-y-8">
-        {aba === 'ativo' && (
+        <div className={aba === 'ativo' ? 'block' : 'hidden'}>
           <CompositorLaco
             gatilhoFocoNovo={lacos.gatilhoFocoNovo}
             aoCriar={async (input) => {
               await lacos.criar(input, prefs.somAtivo);
             }}
             aoImportarImagem={lacos.importarImagem}
+            aoSalvarRascunho={lacos.salvarRascunho}
+            aoLimparRascunho={lacos.limparRascunho}
           />
-        )}
+        </div>
 
         {aba === 'ativo' ? (
           temAtivosNaVisao ? (
@@ -261,7 +285,15 @@ export function App() {
             </div>
           ) : (
             <div className="flex flex-col items-center justify-center py-16 text-center space-y-3">
-              <IconeLacinhoDiscreto tamanho={48} corFita="salvia" animarFita />
+              <span
+                style={{ backgroundColor: `var(--atalho-${prefs.tomAtalho}-bg)` }}
+                className="inline-flex h-12 w-12 items-center justify-center rounded-full"
+              >
+                <IconeLacinhoDiscreto
+                  tamanho={22}
+                  corTracoCss={`var(--atalho-${prefs.tomAtalho}-traco)`}
+                />
+              </span>
               <h2 className="text-base font-semibold text-ink">
                 {busca ? 'Nenhum laço combina com essa busca' : 'Tudo em dia, mente leve!'}
               </h2>
@@ -301,7 +333,9 @@ export function App() {
           </section>
         ) : (
           <div className="flex flex-col items-center justify-center py-16 text-center space-y-3">
-            <IconeLacinhoDiscreto tamanho={44} corFita="lavanda" />
+            <span className="inline-flex h-12 w-12 items-center justify-center rounded-full bg-subtle">
+              <IconeLacinhoDiscreto tamanho={22} corTracoCss="var(--text-muted)" />
+            </span>
             <h2 className="text-base font-semibold text-ink">Nenhum laço desfeito ainda</h2>
             <p className="max-w-sm text-xs text-ink-muted leading-relaxed">
               Quando você concluir uma lembrança puxando ou clicando no laço do card, ela vem
@@ -310,6 +344,19 @@ export function App() {
           </div>
         )}
       </main>
+
+      {/* Modal de configuracao do atalho (Flutuante vs Barra de ferramentas) */}
+      {modalAtalhoAberto && (
+        <ModalConfigAtalho
+          modoAtual={prefs.modoAtalho}
+          tomAtual={prefs.tomAtalho}
+          emTauri={prefs.emTauri}
+          aoEscolherModo={prefs.escolherModoAtalho}
+          aoEscolherTom={prefs.escolherTomAtalho}
+          aoAbrirConfigBarraWindows={prefs.abrirConfigBarraWindows}
+          aoFechar={() => setModalAtalhoAberto(false)}
+        />
+      )}
 
       {/* Modal de edicao */}
       {lacoEditando && (
@@ -338,6 +385,49 @@ export function App() {
           laco={lacos.ultimoDesfeito}
           aoReamarrar={() => void lacos.reamarrar(lacos.ultimoDesfeito!.id, prefs.somAtivo)}
           aoDispensar={lacos.dispensarAvisoDesfeito}
+        />
+      )}
+
+      {/* Aviso de status quando clica manualmente em buscar atualizacao */}
+      {atualizacao.mensagemStatus && !lacos.ultimoDesfeito && (
+        <div
+          role="status"
+          style={{ boxShadow: 'var(--shadow-elevated)' }}
+          className="fixed bottom-5 left-1/2 z-40 flex -translate-x-1/2 items-center gap-2.5 rounded-xl border border-border-strong bg-elevated px-4 py-2"
+        >
+          <span className="text-xs font-medium text-ink">{atualizacao.mensagemStatus}</span>
+          <Botao variante="suave" onClick={atualizacao.abrirMelhoriasVersaoAtual}>
+            <Sparkles className="h-3.5 w-3.5" />
+            <span>Ver melhorias</span>
+          </Botao>
+          <Botao
+            variante="fantasma"
+            apenasIcone
+            aria-label="Fechar aviso"
+            onClick={atualizacao.dispensarMensagemStatus}
+          >
+            <X className="h-3.5 w-3.5" />
+          </Botao>
+        </div>
+      )}
+
+      {/* Modal de confirmacao e progresso da atualizacao automatica */}
+      {atualizacao.infoPendente && (
+        <ModalConfirmarAtualizacao
+          info={atualizacao.infoPendente}
+          instalando={atualizacao.instalando}
+          progresso={atualizacao.progresso}
+          erro={atualizacao.erroInstalacao}
+          aoConfirmar={atualizacao.confirmarEInstalar}
+          aoRecusar={atualizacao.recusarPorAgora}
+        />
+      )}
+
+      {/* Modal de melhorias exibida logo apos reiniciar na versao nova */}
+      {atualizacao.novidadesPosUpdate && (
+        <ModalMelhoriasVersao
+          novidades={atualizacao.novidadesPosUpdate}
+          aoFechar={atualizacao.fecharModalMelhorias}
         />
       )}
     </div>
