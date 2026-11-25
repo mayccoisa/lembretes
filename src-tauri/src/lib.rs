@@ -463,6 +463,14 @@ pub fn run() {
                 modo_atalho: Mutex::new(prefs_iniciais.modo_atalho.clone()),
             });
 
+            // As janelas nascem so agora, com o banco ja no estado do app. Se nascessem pela
+            // configuracao (antes do setup), a tela podia chamar listar_lacos antes do .manage()
+            // e abrir com o mural vazio. Por isso elas tem "create": false no tauri.conf.json.
+            let configs: Vec<_> = app.config().app.windows.clone();
+            for config in configs.iter().filter(|c| !c.create) {
+                tauri::WebviewWindowBuilder::from_config(app.handle(), config)?.build()?;
+            }
+
             aplicar_visibilidade_widget(app.handle(), &prefs_iniciais.modo_atalho);
 
             // Pode falhar quando o atalho da area de trabalho ja reservou Ctrl+Alt+L no Windows;

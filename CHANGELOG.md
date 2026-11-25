@@ -2,6 +2,11 @@
 
 Todas as mudanças relevantes para quem usa o **Lembretes** ficam registradas aqui.
 
+## [0.4.1] · 2026-11-25
+
+### Corrigido
+* **Mural vazio ao reabrir o app:** às vezes, logo depois de fechar e reabrir, o mural aparecia vazio (Ativos 0) mesmo com laços salvos, e só voltava ao normal na abertura seguinte. Os dados nunca se perderam; a tela pedia a lista antes de o banco estar pronto. Agora as janelas só abrem com o banco pronto, e a primeira leitura tenta de novo se falhar.
+
 ## [0.4.0] · 2026-11-25
 
 ### Adicionado

@@ -11,10 +11,8 @@ import { emAmbienteTauri } from './tauriBridge';
 
 const CHAVE_NOVIDADES_LOCAL = 'lembretes:pos-atualizacao:v1';
 
-export const NOTAS_VERSAO_ATUAL = `### Novidades da v0.4.0
-* Bolinha flutuante nova, no estilo vidro: ela pega o tom do que está atrás dela na tela e o lacinho sempre contrasta, no claro e no escuro.
-* Contador na bolinha com os lembretes de hoje e os vencidos, em vermelho quando algum já passou do horário.
-* Ctrl+Alt+L abre o Lembretes mesmo com ele fechado, pelo atalho da área de trabalho, já pronto para amarrar um laço novo.`;
+export const NOTAS_VERSAO_ATUAL = `### Corrigido na v0.4.1
+* O mural às vezes abria vazio logo depois de fechar e reabrir o app, mesmo com laços salvos. Agora ele sempre abre com os seus laços.`;
 
 interface GithubReleasePayload {
   tag_name?: string;

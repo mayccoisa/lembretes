@@ -53,12 +53,31 @@ function emitir(): void {
   for (const fn of ouvintes) fn();
 }
 
+/** Esperas entre tentativas de leitura: cobre a janela em que o shell nativo ainda esta subindo. */
+const ESPERAS_NOVA_TENTATIVA_MS = [150, 400, 1000, 2500];
+
+/**
+ * Le os lacos tentando de novo quando a leitura falha. Sem isso, uma falha passageira na abertura
+ * (comando chegando antes do banco estar pronto) deixava o mural vazio ate a proxima abertura.
+ */
+async function listarLacosComNovaTentativa(): Promise<Laco[]> {
+  for (let tentativa = 0; ; tentativa++) {
+    try {
+      return await listarLacos();
+    } catch (erro) {
+      const espera = ESPERAS_NOVA_TENTATIVA_MS[tentativa];
+      if (espera === undefined) throw erro;
+      await new Promise((resolver) => setTimeout(resolver, espera));
+    }
+  }
+}
+
 export async function recarregarCacheLacos(forcar = false): Promise<void> {
   const agora = Date.now();
   if (!forcar && cache.carregado && agora - cache.atualizadoEmMs < STALE_TIME_MS) {
     return;
   }
-  const lista = await listarLacos();
+  const lista = await listarLacosComNovaTentativa();
   cache = {
     ...cache,
     lacos: lista,
@@ -112,6 +131,11 @@ function assinar(ouvinte: () => void): () => void {
 }
 
 function obterSnapshot(): EstadoCacheLacos {
+  return cache;
+}
+
+/** Leitura direta do cache, para teste e diagnostico; as telas usam useLacos. */
+export function lerEstadoCacheLacos(): EstadoCacheLacos {
   return cache;
 }
 

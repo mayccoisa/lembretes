@@ -1,7 +1,7 @@
 {
   "name": "lembretes",
   "private": true,
-  "version": "0.4.0",
+  "version": "0.4.1",
   "type": "module",
   "description": "Lembretes: mural visual rápido, recorrencia, notificacoes do dia e MCP local",
   "scripts": {
