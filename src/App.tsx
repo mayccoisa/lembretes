@@ -30,6 +30,7 @@ import { Botao } from './components/ui/Botao';
 import { CampoTexto } from './components/ui/CampoTexto';
 import { DedoFlutuanteWidget } from './components/widget/DedoFlutuanteWidget';
 import { useAtualizacao } from './hooks/useAtualizacao';
+import { useCorFundoWidget } from './hooks/useCorFundoWidget';
 import { useLacos } from './hooks/useLacos';
 import { usePreferencias } from './hooks/usePreferencias';
 
@@ -73,6 +74,7 @@ export function App() {
   const prefs = usePreferencias();
   const lacos = useLacos(busca, somenteHoje && aba === 'ativo');
   const atualizacao = useAtualizacao(!modoJanelaWidget);
+  const corFundoWidget = useCorFundoWidget(modoJanelaWidget);
 
   if (modoJanelaWidget) {
     return (
@@ -80,10 +82,12 @@ export function App() {
         modoJanelaNativa
         tom={prefs.tomAtalho}
         totalAtivos={lacos.totalAtivos}
-        quantidadeVencidos={lacos.totalVencendoHoje}
+        quantidadePendentes={lacos.totalPendentesAgora}
+        quantidadeVencidos={lacos.quantidadeVencidos}
         aoAbrirLembrancas={() => void lacos.abrirMuralNativo(false)}
         aoMenuContexto={() => void prefs.mostrarMenuWidgetNativo()}
         aoIniciarArrasteNativo={lacos.iniciarArrasteJanela}
+        corFundoTela={corFundoWidget}
       />
     );
   }
@@ -98,7 +102,8 @@ export function App() {
           modoJanelaNativa={false}
           tom={prefs.tomAtalho}
           totalAtivos={lacos.totalAtivos}
-          quantidadeVencidos={lacos.totalVencendoHoje}
+          quantidadePendentes={lacos.totalPendentesAgora}
+          quantidadeVencidos={lacos.quantidadeVencidos}
           posicaoPreview={prefs.posicaoWidgetPreview}
           aoMoverPreview={prefs.moverWidgetPreview}
           aoAbrirLembrancas={() => setAba('ativo')}

@@ -133,6 +133,11 @@ export function useLacos(busca = '', somenteHoje = false) {
   const todosDesfeitos = ordenarLacos(estado.lacos, 'desfeito', agoraMs);
   const vencendoHoje = listarVencendoHoje(estado.lacos);
   const quantidadeVencidos = todosAtivosVisiveis.filter((l) => lacoEstaVencido(l, agoraMs)).length;
+  // Insignia da bolinha: lacos de hoje somados aos vencidos de dias anteriores, sem contar duas vezes
+  const idsPendentesAgora = new Set(vencendoHoje.map((l) => l.id));
+  for (const l of todosAtivosVisiveis) {
+    if (lacoEstaVencido(l, agoraMs)) idsPendentesAgora.add(l.id);
+  }
 
   const criar = async (input: NovoLacoInput, somAtivo: boolean) => {
     limparRascunhoCompositor();
@@ -216,6 +221,7 @@ export function useLacos(busca = '', somenteHoje = false) {
     totalAgendados: todosAgendados.length,
     totalDesfeitos: todosDesfeitos.length,
     totalVencendoHoje: vencendoHoje.length,
+    totalPendentesAgora: idsPendentesAgora.size,
     quantidadeVencidos,
     ultimoDesfeito: estado.ultimoDesfeito,
     gatilhoFocoNovo: estado.gatilhoFocoNovo,

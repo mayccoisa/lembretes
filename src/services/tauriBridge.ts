@@ -72,6 +72,13 @@ export async function tauriMostrarMenuWidget(): Promise<void> {
   await invoke('mostrar_menu_widget');
 }
 
+/** Cor media logo atras da bolinha flutuante, em RGB; null fora do Windows ou quando nao deu para ler. */
+export async function tauriAmostrarCorFundoWidget(): Promise<[number, number, number] | null> {
+  if (!emAmbienteTauri()) return null;
+  const { invoke } = await import('@tauri-apps/api/core');
+  return invoke<[number, number, number] | null>('amostrar_cor_fundo_widget');
+}
+
 export async function tauriAbrirConfigBarraWindows(): Promise<void> {
   if (!emAmbienteTauri()) return;
   const { invoke } = await import('@tauri-apps/api/core');

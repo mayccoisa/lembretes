@@ -13,7 +13,7 @@ Copie o bloco de [configuracao.exemplo.json](../mcp/configuracao.exemplo.json) p
       "command": "node",
       "args": [
         "--no-warnings",
-        "C:/proj/producthub/produtos/lembretes/mcp/iniciar.mjs"
+        "D:/projetos/lembretes/mcp/iniciar.mjs"
       ]
     }
   }

@@ -6,7 +6,7 @@ Esta frase é o critério de desempate técnico: decisão que facilita outra coi
 
 ## Regras herdadas
 
-Valem aqui todas as regras do **Livro de Decisões Técnico** do Product Hub (`../../hub/.claude/decisoes/tecnicas.md`), com seus níveis A/B/C. Este arquivo guarda apenas o que é específico do **Lembretes**.
+Valem aqui todas as regras do **Livro de Decisões Técnico** do Product Hub (`C:\proj\producthub\hub\.claude\decisoes\tecnicas.md`), com seus níveis A/B/C. Este arquivo guarda apenas o que é específico do **Lembretes**.
 
 ## Mapa do repositório
 

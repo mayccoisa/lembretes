@@ -251,6 +251,65 @@ fn mostrar_menu_widget(app: AppHandle) -> Result<(), String> {
     Ok(())
 }
 
+/// Le a cor media logo em volta da janela da bolinha, para ela se adaptar ao que esta atras.
+/// So le um anel de 8 pixels fora da janela (nunca a propria bolinha), sem captura de tela e sem guardar nada.
+#[tauri::command]
+fn amostrar_cor_fundo_widget(app: AppHandle) -> Option<[u8; 3]> {
+    let widget = app.get_webview_window("widget")?;
+    if !widget.is_visible().unwrap_or(false) {
+        return None;
+    }
+    let pos = widget.outer_position().ok()?;
+    let tam = widget.outer_size().ok()?;
+    let (x0, y0) = (pos.x, pos.y);
+    let (x1, y1) = (pos.x + tam.width as i32, pos.y + tam.height as i32);
+    let (mx, my) = ((x0 + x1) / 2, (y0 + y1) / 2);
+    let folga = 6;
+    let pontos = [
+        (x0 - folga, my),
+        (x1 + folga, my),
+        (mx, y0 - folga),
+        (mx, y1 + folga),
+        (x0 - folga, y0 - folga),
+        (x1 + folga, y0 - folga),
+        (x0 - folga, y1 + folga),
+        (x1 + folga, y1 + folga),
+    ];
+    ler_media_pixels(&pontos)
+}
+
+#[cfg(target_os = "windows")]
+fn ler_media_pixels(pontos: &[(i32, i32)]) -> Option<[u8; 3]> {
+    use windows_sys::Win32::Graphics::Gdi::{GetDC, GetPixel, ReleaseDC, CLR_INVALID};
+    unsafe {
+        let hdc = GetDC(std::ptr::null_mut());
+        if hdc.is_null() {
+            return None;
+        }
+        let (mut r, mut g, mut b, mut n) = (0u32, 0u32, 0u32, 0u32);
+        for &(x, y) in pontos {
+            let cor = GetPixel(hdc, x, y);
+            if cor == CLR_INVALID {
+                continue;
+            }
+            r += cor & 0xFF;
+            g += (cor >> 8) & 0xFF;
+            b += (cor >> 16) & 0xFF;
+            n += 1;
+        }
+        ReleaseDC(std::ptr::null_mut(), hdc);
+        if n == 0 {
+            return None;
+        }
+        Some([(r / n) as u8, (g / n) as u8, (b / n) as u8])
+    }
+}
+
+#[cfg(not(target_os = "windows"))]
+fn ler_media_pixels(_pontos: &[(i32, i32)]) -> Option<[u8; 3]> {
+    None
+}
+
 #[tauri::command]
 fn abrir_config_barra_windows() -> Result<(), String> {
     #[cfg(target_os = "windows")]
@@ -306,11 +365,16 @@ fn confirmar_leitura_novidades(state: State<'_, AppState>) {
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    // O atalho da area de trabalho passa --novo: com a tecla Ctrl+Alt+L do proprio atalho,
+    // o Windows abre o app fechado ou, se ja estiver aberto, avisa esta instancia para amarrar um laco novo.
+    let pediu_novo = std::env::args().any(|a| a == "--novo");
+
     let listener_unico = match TcpListener::bind(ENDPOINT_INSTANCIA_UNICA) {
         Ok(l) => l,
         Err(_) => {
             if let Ok(mut stream) = TcpStream::connect(ENDPOINT_INSTANCIA_UNICA) {
-                let _ = stream.write_all(b"ABRIR\n");
+                let comando: &[u8] = if pediu_novo { b"NOVO\n" } else { b"ABRIR\n" };
+                let _ = stream.write_all(comando);
             }
             return;
         }
@@ -366,7 +430,7 @@ pub fn run() {
                         let _ = handle_ipc.emit("lacos:mudou", ());
                         continue;
                     }
-                    mostrar_mural(&handle_ipc, false, false);
+                    mostrar_mural(&handle_ipc, cmd == "NOVO", false);
                 }
             });
 
@@ -401,7 +465,12 @@ pub fn run() {
 
             aplicar_visibilidade_widget(app.handle(), &prefs_iniciais.modo_atalho);
 
+            // Pode falhar quando o atalho da area de trabalho ja reservou Ctrl+Alt+L no Windows;
+            // nesse caso a tecla chega pelo comando NOVO da instancia unica, com o mesmo efeito.
             let _ = app.global_shortcut().register(atalho_padrao);
+            if pediu_novo {
+                mostrar_mural(app.handle(), true, false);
+            }
 
             let item_abrir = MenuItem::with_id(app, "abrir", "Abrir Lembretes", true, None::<&str>)?;
             let item_novo = MenuItem::with_id(
@@ -463,6 +532,7 @@ pub fn run() {
             obter_modo_atalho,
             definir_modo_atalho,
             mostrar_menu_widget,
+            amostrar_cor_fundo_widget,
             abrir_config_barra_windows,
             verificar_atualizacao,
             instalar_atualizacao,

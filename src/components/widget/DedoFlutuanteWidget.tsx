@@ -1,36 +1,49 @@
 import { useRef, useState, type MouseEvent, type PointerEvent } from 'react';
 import type { TomBotaoAtalho } from '../../hooks/usePreferencias';
 import { IconeLacinhoDiscreto } from '../arte/IconeLacinhoDiscreto';
+import { coresBolinhaVidro, type Rgb } from '../../theme/corAdaptativa';
 
 interface DedoFlutuanteWidgetProps {
   modoJanelaNativa: boolean;
   tom: TomBotaoAtalho;
   totalAtivos: number;
+  /** Lacos de hoje somados aos vencidos, sem duplicata: e o numero da insignia. */
+  quantidadePendentes: number;
+  /** Quantos ja passaram do horario: pinta a insignia de vermelho. */
   quantidadeVencidos: number;
   posicaoPreview?: { x: number; y: number };
   aoMoverPreview?: (x: number, y: number) => void;
   aoAbrirLembrancas: () => void;
   aoMenuContexto?: () => void;
   aoIniciarArrasteNativo: () => Promise<void>;
+  /** Cor lida atras da bolinha (Windows nativo). Com ela a bolinha vira Vidro; sem ela usa o tom fixo. */
+  corFundoTela?: Rgb | null;
 }
 
 /**
- * Botao circular minimalista monoline (38x38px):
- * circulo suave plano com lacinho geometrico de linha fina no centro.
- * Clique esquerdo abre/recolhe as lembrancas; arrastar move; clique direito abre opcoes (enviar para barra).
+ * Bolinha flutuante de 40px com o lacinho monoline no centro, no estilo Vidro:
+ * com a cor lida atras dela, fica um passo mais clara ou mais escura que a tela e o lacinho contrasta.
+ * Borda fina no lugar de sombra, para ler em qualquer papel de parede sem halo.
+ * Estado por fundo: hover escurece, clique aperta, arraste cresce um pouco.
+ * Insignia numerica no canto: vermelha quando ha laco vencido, neutra quando so ha laco do dia.
+ * Clique esquerdo abre ou recolhe o mural; arrastar move; clique direito abre as opcoes.
  */
 export function DedoFlutuanteWidget({
   modoJanelaNativa,
   tom,
   totalAtivos,
+  quantidadePendentes,
   quantidadeVencidos,
   posicaoPreview = { x: 24, y: 120 },
   aoMoverPreview,
   aoAbrirLembrancas,
   aoMenuContexto,
   aoIniciarArrasteNativo,
+  corFundoTela = null,
 }: DedoFlutuanteWidgetProps) {
   const [arrastando, setArrastando] = useState(false);
+  const [pressionado, setPressionado] = useState(false);
+  const [sobre, setSobre] = useState(false);
   const pontoInicialRef = useRef<{
     clientX: number;
     clientY: number;
@@ -42,6 +55,7 @@ export function DedoFlutuanteWidget({
   const aoPressionar = (ev: PointerEvent<HTMLDivElement>) => {
     if (ev.button !== 0) return;
     virouArrasteRef.current = false;
+    setPressionado(true);
     pontoInicialRef.current = {
       clientX: ev.clientX,
       clientY: ev.clientY,
@@ -64,6 +78,7 @@ export function DedoFlutuanteWidget({
     if (distancia > 4 && !virouArrasteRef.current) {
       virouArrasteRef.current = true;
       setArrastando(true);
+      setPressionado(false);
       if (modoJanelaNativa) {
         pontoInicialRef.current = null;
         void aoIniciarArrasteNativo().finally(() => setArrastando(false));
@@ -72,8 +87,8 @@ export function DedoFlutuanteWidget({
     }
 
     if (virouArrasteRef.current && !modoJanelaNativa && aoMoverPreview) {
-      const maxX = Math.max(12, window.innerWidth - 48);
-      const maxY = Math.max(12, window.innerHeight - 48);
+      const maxX = Math.max(12, window.innerWidth - 52);
+      const maxY = Math.max(12, window.innerHeight - 52);
       const novoX = Math.min(maxX, Math.max(8, ini.origX + dx));
       const novoY = Math.min(maxY, Math.max(8, ini.origY + dy));
       aoMoverPreview(novoX, novoY);
@@ -86,6 +101,7 @@ export function DedoFlutuanteWidget({
     pontoInicialRef.current = null;
     virouArrasteRef.current = false;
     setArrastando(false);
+    setPressionado(false);
 
     if (!eraArraste) {
       aoAbrirLembrancas();
@@ -99,42 +115,81 @@ export function DedoFlutuanteWidget({
     }
   };
 
-  const temAlerta = quantidadeVencidos > 0;
-  const dica =
-    totalAtivos > 0
-      ? `Lembretes (${totalAtivos} ativos) · Clique para abrir, arraste ou clique com o direito`
-      : 'Lembretes · Clique para abrir, arraste ou clique com o direito';
+  const temVencido = quantidadeVencidos > 0;
+  const temPendente = quantidadePendentes > 0;
+  const textoInsignia = quantidadePendentes > 9 ? '9+' : String(quantidadePendentes);
+
+  const partesDica = [`Lembretes · ${totalAtivos} ${totalAtivos === 1 ? 'ativo' : 'ativos'}`];
+  if (temVencido) {
+    partesDica.push(`${quantidadeVencidos} ${quantidadeVencidos === 1 ? 'vencido' : 'vencidos'}`);
+  } else if (temPendente) {
+    partesDica.push(`${quantidadePendentes} para hoje`);
+  }
+  const dica = `${partesDica.join(' · ')}. Clique para abrir, arraste para mover, botão direito para opções`;
+
+  const vidro = corFundoTela ? coresBolinhaVidro(corFundoTela, sobre || arrastando) : null;
+  const fundo = vidro
+    ? vidro.fundo
+    : sobre || arrastando
+      ? `var(--atalho-${tom}-bg-hover)`
+      : `var(--atalho-${tom}-bg)`;
+  const borda = vidro ? vidro.borda : `var(--atalho-${tom}-borda)`;
+  const traco = vidro ? vidro.traco : `var(--atalho-${tom}-traco)`;
+  const insigniaHojeBg = vidro ? vidro.insigniaHojeBg : 'var(--atalho-insignia-hoje-bg)';
+  const insigniaHojeTexto = vidro ? vidro.insigniaHojeTexto : 'var(--atalho-insignia-hoje-texto)';
+  const foco = vidro ? vidro.traco : 'var(--atalho-foco)';
+  const escala = arrastando ? 'scale-105' : pressionado ? 'scale-95' : 'scale-100';
 
   const circulo = (
-    <div
-      onPointerDown={aoPressionar}
-      onPointerMove={aoMover}
-      onPointerUp={aoSoltar}
-      onContextMenu={aoClicarDireito}
-      role="button"
-      tabIndex={0}
-      onKeyDown={(ev) => {
-        if (ev.key === 'Enter' || ev.key === ' ') {
-          ev.preventDefault();
-          aoAbrirLembrancas();
-        }
-      }}
-      aria-label={dica}
-      title={dica}
-      style={{
-        backgroundColor: `var(--atalho-${tom}-bg)`,
-      }}
-      className={`flex h-9.5 w-9.5 items-center justify-center rounded-full transition-all duration-150 select-none ${
-        arrastando
-          ? 'scale-105 opacity-100 cursor-grabbing'
-          : 'opacity-90 hover:opacity-100 hover:scale-105 cursor-grab'
-      }`}
-    >
-      <IconeLacinhoDiscreto
-        tamanho={18}
-        corTracoCss={`var(--atalho-${tom}-traco)`}
-        alertaAtivo={temAlerta}
-      />
+    <div className="relative h-10 w-10">
+      <div
+        onPointerDown={aoPressionar}
+        onPointerMove={aoMover}
+        onPointerUp={aoSoltar}
+        onPointerEnter={() => setSobre(true)}
+        onPointerLeave={() => {
+          setSobre(false);
+          setPressionado(false);
+        }}
+        onContextMenu={aoClicarDireito}
+        role="button"
+        tabIndex={0}
+        onKeyDown={(ev) => {
+          if (ev.key === 'Enter' || ev.key === ' ') {
+            ev.preventDefault();
+            aoAbrirLembrancas();
+          }
+        }}
+        aria-label={dica}
+        title={dica}
+        style={{
+          backgroundColor: fundo,
+          borderColor: borda,
+          outlineColor: foco,
+        }}
+        className={`flex h-10 w-10 items-center justify-center rounded-full border select-none transition-[transform,background-color,border-color] duration-300 ease-out focus-visible:outline-2 focus-visible:outline-offset-2 ${escala} ${
+          arrastando ? 'cursor-grabbing' : 'cursor-pointer'
+        }`}
+      >
+        <IconeLacinhoDiscreto tamanho={20} corTracoCss={traco} />
+      </div>
+
+      {temPendente && (
+        <span
+          aria-hidden="true"
+          style={{
+            backgroundColor: temVencido
+              ? 'var(--atalho-insignia-alerta-bg)'
+              : insigniaHojeBg,
+            color: temVencido
+              ? 'var(--atalho-insignia-alerta-texto)'
+              : insigniaHojeTexto,
+          }}
+          className="pointer-events-none absolute -right-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full px-1 text-[10px] leading-none font-semibold tabular-nums"
+        >
+          {textoInsignia}
+        </span>
+      )}
     </div>
   );
 

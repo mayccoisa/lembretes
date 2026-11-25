@@ -66,6 +66,18 @@
   --atalho-neutro-traco: #2b2622;
   --atalho-carmim-bg: #ffd9df;
   --atalho-carmim-traco: #7a182b;
+  --atalho-lavanda-bg-hover: #b1bff9;
+  --atalho-lavanda-borda: rgba(39, 50, 92, 0.22);
+  --atalho-neutro-bg-hover: #ddd7cd;
+  --atalho-neutro-borda: rgba(43, 38, 34, 0.2);
+  --atalho-carmim-bg-hover: #ffc4cd;
+  --atalho-carmim-borda: rgba(122, 24, 43, 0.22);
+  /* Insignia de contagem da bolinha: vermelha com vencido, neutra so com lembrete do dia */
+  --atalho-insignia-alerta-bg: var(--color-accent-600);
+  --atalho-insignia-alerta-texto: #ffffff;
+  --atalho-insignia-hoje-bg: #2b2622;
+  --atalho-insignia-hoje-texto: #fbf8f4;
+  --atalho-foco: #211c18;
 
   /* 6 Cores semanticas das fitas dos lacos (claro) */
   --fita-carmim-bg: #fff7f7;
@@ -139,6 +151,17 @@
   --atalho-neutro-traco: #f2ece6;
   --atalho-carmim-bg: #4a2229;
   --atalho-carmim-traco: #ffbbc6;
+  --atalho-lavanda-bg-hover: #a6b6f8;
+  --atalho-lavanda-borda: rgba(31, 41, 77, 0.3);
+  --atalho-neutro-bg-hover: #433b36;
+  --atalho-neutro-borda: rgba(242, 236, 230, 0.16);
+  --atalho-carmim-bg-hover: #5a2a33;
+  --atalho-carmim-borda: rgba(255, 187, 198, 0.2);
+  --atalho-insignia-alerta-bg: var(--color-accent-500);
+  --atalho-insignia-alerta-texto: #ffffff;
+  --atalho-insignia-hoje-bg: #f2ece6;
+  --atalho-insignia-hoje-texto: #211c18;
+  --atalho-foco: #f6f1eb;
 
   /* 6 Cores semanticas das fitas dos lacos (escuro) */
   --fita-carmim-bg: #291c1e;

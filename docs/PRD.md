@@ -73,7 +73,7 @@ Inspirado na simplicidade do mural do Google Keep e na tradição lúdica de **a
 ## 8. Impacto na Arquitetura e Pendências
 
 ### Impacto no Produto
-Produto novo (`Lembretes`, ID no Hub `hDZh1N0VkYdxcpXrZQ5C`, repositório local em `C:\proj\producthub\produtos\lembretes`), sem acoplamento com bancos ou serviços dos demais produtos do workspace. Mapa de arquitetura inaugurado do zero nesta iniciativa.
+Produto novo (`Lembretes`, ID no Hub `hDZh1N0VkYdxcpXrZQ5C`, repositório local em `D:\projetos\lembretes`), sem acoplamento com bancos ou serviços dos demais produtos do workspace. Mapa de arquitetura inaugurado do zero nesta iniciativa.
 
 ### Pendências Declaradas
 1. **Combinação padrão do atalho global configurável** (default inicial implementado `Ctrl+Alt+L`, futura tela de personalização) · **Decide:** PM / Designer.
