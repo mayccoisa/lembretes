@@ -72,7 +72,7 @@ const lacoSchema = z.object({
 
 export function criarServidorMcp() {
   const server = new McpServer(
-    { name: 'lembretes', version: '0.3.0' },
+    { name: 'lembretes', version: '0.4.0' },
     { instructions: GUIA_AGENTE }
   );
 

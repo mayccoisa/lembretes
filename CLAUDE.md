@@ -55,5 +55,5 @@ npm run tauri:build    # Gera o instalador nativo do Windows (.msi / .exe)
 
 ## Orçamento de performance (Passo 7 · T-09)
 
-* **Base medida no boot (`dist/index.html` gzipped):** **100,7 KB gzip** (`93,9 KB` JS + `6,5 KB` CSS + `0,3 KB` HTML, medido por `npm run medir:boot` em 19/11/2026 na `v0.3.0`).
+* **Base medida no boot (`dist/index.html` gzipped):** **102,0 KB gzip** (`94,9 KB` JS + `6,9 KB` CSS + `0,3 KB` HTML, medido por `npm run medir:boot` em 25/11/2026 na `v0.4.0`).
 * **Teto declarado:** **120 KB gzip**. Fatia que ultrapassar o teto bloqueia até ser otimizada ou ter aumento aprovado pelo dono.

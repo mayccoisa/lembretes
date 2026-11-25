@@ -11,10 +11,10 @@ import { emAmbienteTauri } from './tauriBridge';
 
 const CHAVE_NOVIDADES_LOCAL = 'lembretes:pos-atualizacao:v1';
 
-export const NOTAS_VERSAO_ATUAL = `### Adicionado na v0.3.0
-* Servidor MCP oficial integrado (mcp/iniciar.mjs): qualquer agente de IA consegue analisar canais e criar lembretes recorrentes sem duplicar demandas ocultas.
-* Lembretes recorrentes inteligentes: suporte a repetição diária, dias úteis, semanal, mensal ou por intervalo. Ao desfazer hoje, o laço some hoje e volta sozinho no próximo ciclo.
-* Resumo de vencimentos de hoje: aviso automático no Windows, faixa de foco rápido e botão Hoje (N) no topo mostrando tudo que vence no dia.`;
+export const NOTAS_VERSAO_ATUAL = `### Novidades da v0.4.0
+* Bolinha flutuante nova, no estilo vidro: ela pega o tom do que está atrás dela na tela e o lacinho sempre contrasta, no claro e no escuro.
+* Contador na bolinha com os lembretes de hoje e os vencidos, em vermelho quando algum já passou do horário.
+* Ctrl+Alt+L abre o Lembretes mesmo com ele fechado, pelo atalho da área de trabalho, já pronto para amarrar um laço novo.`;
 
 interface GithubReleasePayload {
   tag_name?: string;

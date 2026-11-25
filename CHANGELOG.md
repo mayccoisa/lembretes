@@ -2,6 +2,15 @@
 
 Todas as mudanças relevantes para quem usa o **Lembretes** ficam registradas aqui.
 
+## [0.4.0] · 2026-11-25
+
+### Adicionado
+* **Ctrl+Alt+L abre o app mesmo fechado:** o atalho da área de trabalho guarda a tecla, então ela abre o Lembretes de qualquer lugar. Com o app já aberto, traz o mural para frente pronto para amarrar um laço novo, sem abrir uma segunda cópia.
+* **Contador na bolinha:** o número de lembretes de hoje somados aos vencidos aparece no canto da bolinha, vermelho quando algum já passou do horário e neutro quando só há lembretes do dia.
+
+### Melhorado
+* **Bolinha flutuante no estilo vidro:** a bolinha lê a cor logo em volta dela e fica um passo mais clara sobre telas escuras ou mais escura sobre telas claras, com borda fina e o lacinho sempre em contraste. Ao passar o mouse o tom muda, e no clique ela afunda um pouco.
+
 ## [0.3.0] · 2026-11-19
 
 ### Adicionado
