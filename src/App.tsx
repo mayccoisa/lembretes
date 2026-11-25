@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { lazy, Suspense, useEffect, useState } from 'react';
 import {
   Bell,
   BellRing,
@@ -35,6 +35,11 @@ import { useLacos } from './hooks/useLacos';
 import { usePreferencias } from './hooks/usePreferencias';
 
 type AbaMural = 'ativo' | 'agendado' | 'desfeito';
+const PainelConta = lazy(() => import('./components/mural/PainelConta'));
+const ControladorSincronizacao = lazy(() => import('./hooks/useSincronizacao')
+  .then((modulo) => ({ default: modulo.ControladorSincronizacao })));
+const contaDisponivel = Boolean(import.meta.env.VITE_FIREBASE_PROJECT_ID && import.meta.env.VITE_FIREBASE_API_KEY)
+  || (import.meta.env.DEV && import.meta.env.VITE_FIREBASE_EMULADOR === 'true');
 
 interface TauriMetadataWindow {
   __TAURI_INTERNALS__?: {
@@ -70,11 +75,19 @@ export function App() {
   );
   const [modalAtalhoAberto, setModalAtalhoAberto] = useState(false);
   const [modalHojeAberto, setModalHojeAberto] = useState(false);
+  const [painelContaAberto, setPainelContaAberto] = useState(false);
+  const [iniciarSincronizacao, setIniciarSincronizacao] = useState(false);
 
   const prefs = usePreferencias();
   const lacos = useLacos(busca, somenteHoje && aba === 'ativo');
   const atualizacao = useAtualizacao(!modoJanelaWidget);
   const corFundoWidget = useCorFundoWidget(modoJanelaWidget);
+
+  useEffect(() => {
+    if (modoJanelaWidget || !contaDisponivel || !prefs.emTauri) return;
+    const timer = setTimeout(() => setIniciarSincronizacao(true), 750);
+    return () => clearTimeout(timer);
+  }, [modoJanelaWidget, prefs.emTauri]);
 
   if (modoJanelaWidget) {
     return (
@@ -97,6 +110,9 @@ export function App() {
 
   return (
     <div className="min-h-screen bg-canvas text-ink transition-colors">
+      {iniciarSincronizacao && (
+        <Suspense fallback={null}><ControladorSincronizacao /></Suspense>
+      )}
       {!prefs.emTauri && prefs.modoAtalho === 'flutuante' && (
         <DedoFlutuanteWidget
           modoJanelaNativa={false}
@@ -156,6 +172,10 @@ export function App() {
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
+            {contaDisponivel && (
+              <Botao aria-controls="painel-conta" aria-expanded={painelContaAberto}
+                onClick={() => setPainelContaAberto((aberto) => !aberto)}>Conta</Botao>
+            )}
             <AlternadorAba
               valor={aba}
               aoMudar={(nova) => {
@@ -244,6 +264,15 @@ export function App() {
             </Botao>
           </div>
         </div>
+        {contaDisponivel && (
+          <div id="painel-conta" hidden={!painelContaAberto} className="mx-auto max-w-6xl px-4 pb-4">
+            {painelContaAberto && (
+              <Suspense fallback={<p role="status" className="text-xs text-ink-muted">Abrindo conta…</p>}>
+                <PainelConta sincronizacaoDisponivel={prefs.emTauri} />
+              </Suspense>
+            )}
+          </div>
+        )}
       </header>
 
       <main className="mx-auto max-w-6xl px-4 py-6 space-y-6">

@@ -12,6 +12,9 @@ permissions:
 jobs:
   release-windows:
     runs-on: windows-latest
+    env:
+      VITE_FIREBASE_PROJECT_ID: lembretes-mayccoisa
+      VITE_FIREBASE_API_KEY: ${{ vars.LEMBRETES_FIREBASE_API_KEY }}
     steps:
       - name: Checkout do codigo
         uses: actions/checkout@v4
@@ -31,7 +34,9 @@ jobs:
           workspaces: src-tauri
 
       - name: Instalar dependencias e validar regua completa
+        shell: pwsh
         run: |
+          if (-not $env:VITE_FIREBASE_API_KEY) { throw 'Configure a variável LEMBRETES_FIREBASE_API_KEY no repositório antes da publicação.' }
           npm ci
           npm run check
 

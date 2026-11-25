@@ -1,6 +1,6 @@
 [package]
 name = "lembretes"
-version = "0.4.1"
+version = "0.5.0"
 description = "Lembretes: mural visual e dedo com lacinho flutuante no Windows"
 authors = ["Maycon Rocha"]
 edition = "2021"

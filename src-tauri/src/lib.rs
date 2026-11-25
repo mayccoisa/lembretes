@@ -99,6 +99,87 @@ fn listar_lacos(state: State<'_, AppState>) -> Result<Vec<Laco>, String> {
 }
 
 #[tauri::command]
+fn conta_sincronizada(state: State<'_, AppState>) -> Result<Option<String>, String> {
+    let conn = state.db.lock().map_err(|_| "Banco ocupado".to_string())?;
+    db::conta_sincronizada(&conn)
+}
+
+#[tauri::command]
+async fn vincular_conta(app: AppHandle, uid: String) -> Result<(), String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let estado = app.state::<AppState>();
+        let conn = estado.db.lock().map_err(|_| "Banco ocupado".to_string())?;
+        db::vincular_conta_com_backup(&conn, &uid, &estado.pasta_dados.join("backups"))
+    }).await.map_err(|e| e.to_string())?
+}
+
+#[tauri::command]
+fn versao_externa_banco(state: State<'_, AppState>) -> Result<i64, String> {
+    let conn = state.db.lock().map_err(|_| "Banco ocupado".to_string())?;
+    conn.query_row("PRAGMA data_version", [], |linha| linha.get(0)).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+fn registrar_notificacao_local(
+    state: State<'_, AppState>,
+    id: String,
+    lembrar_em: String,
+    notificado_em: String,
+) -> Result<bool, String> {
+    let conn = state.db.lock().map_err(|_| "Banco ocupado".to_string())?;
+    db::registrar_notificacao_local(&conn, &id, &lembrar_em, &notificado_em)
+}
+
+#[tauri::command]
+async fn listar_para_sincronizar(app: AppHandle, uid: String) -> Result<Vec<Laco>, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let state = app.state::<AppState>();
+        let conn = state.db.lock().map_err(|_| "Banco ocupado".to_string())?;
+        db::listar_para_sincronizar(&conn, &uid)
+    }).await.map_err(|e| e.to_string())?
+}
+
+#[tauri::command]
+async fn aplicar_laco_remoto(
+    app: AppHandle,
+    uid: String,
+    laco: Laco,
+    versao_esperada: Option<i64>,
+    data_esperada: Option<String>,
+) -> Result<bool, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let alterado = {
+            let state = app.state::<AppState>();
+            let conn = state.db.lock().map_err(|_| "Banco ocupado".to_string())?;
+            db::aplicar_laco_remoto(&conn, &uid, laco, versao_esperada, data_esperada)?
+        };
+        if alterado {
+            let _ = app.emit("lacos:mudou", ());
+        }
+        Ok(alterado)
+    }).await.map_err(|e| e.to_string())?
+}
+
+#[tauri::command]
+async fn ler_imagem_sincronizacao(app: AppHandle, nome: String) -> Result<String, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let (id, extensao) = nome.rsplit_once('.').ok_or("Nome de imagem inválido")?;
+        if Uuid::parse_str(id).is_err() || extensao.is_empty() || extensao.len() > 16
+            || !extensao.bytes().all(|byte| byte.is_ascii_alphanumeric()) {
+            return Err("Nome de imagem inválido".into());
+        }
+        let estado = app.state::<AppState>();
+        let pasta = estado.pasta_imagens.canonicalize().map_err(|e| e.to_string())?;
+        let arquivo = pasta.join(&nome).canonicalize().map_err(|e| e.to_string())?;
+        if arquivo.parent() != Some(pasta.as_path()) {
+            return Err("Imagem fora da pasta dos Lembretes".into());
+        }
+        let bytes = fs::read(arquivo).map_err(|e| e.to_string())?;
+        Ok(STANDARD.encode(bytes))
+    }).await.map_err(|e| e.to_string())?
+}
+
+#[tauri::command]
 fn criar_laco(
     app: AppHandle,
     state: State<'_, AppState>,
@@ -530,6 +611,13 @@ pub fn run() {
         })
         .invoke_handler(tauri::generate_handler![
             listar_lacos,
+            conta_sincronizada,
+            vincular_conta,
+            versao_externa_banco,
+            registrar_notificacao_local,
+            listar_para_sincronizar,
+            aplicar_laco_remoto,
+            ler_imagem_sincronizacao,
             criar_laco,
             atualizar_laco,
             desfazer_laco,

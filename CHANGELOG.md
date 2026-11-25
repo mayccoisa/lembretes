@@ -2,6 +2,13 @@
 
 Todas as mudanças relevantes para quem usa o **Lembretes** ficam registradas aqui.
 
+## [0.5.0] · 2026-11-25
+
+### Adicionado
+* **Conta por e-mail e senha:** crie uma conta na opção **Conta** do mural ou recupere o acesso pelo próprio aplicativo.
+* **Sincronização entre computadores:** entre com a mesma conta e ative a sincronização em cada computador. Lembretes, checklists e imagens acompanham a conta. Os dados continuam disponíveis no computador durante falhas de conexão.
+* **Importação dos lembretes existentes:** ao ativar a sincronização, o app cria uma cópia de segurança do banco local e inclui os lembretes que você já tinha, com os anexos.
+
 ## [0.4.1] · 2026-11-25
 
 ### Corrigido

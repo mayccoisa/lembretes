@@ -10,7 +10,8 @@ A partir da primeira instalação, o próprio aplicativo avisa quando sair vers�
 ## Principais recursos
 
 * **Mural estilo Google Keep:** crie laços rápidos com título opcional, texto livre ou checklist marcável direto no card, 6 cores de fita, fixação no topo (*pin*), busca instantânea e temas claro e escuro.
-* **Auto-save contínuo e blindagem local:** clicar fora ou apertar `Esc` salva automaticamente; rascunhos são gravados a cada tecla e os dados vivem 100% locais em SQLite (`WAL` + histórico imutável de versões).
+* **Auto-save contínuo e blindagem local:** clicar fora ou apertar `Esc` salva automaticamente. Rascunhos são gravados a cada tecla e os lembretes ficam disponíveis no SQLite com histórico local de versões.
+* **Sincronização opcional:** entre em **Conta** com o mesmo e-mail em cada computador e use **Ativar sincronização neste computador**. O mural e os anexos são reunidos no Firebase, com acesso restrito à conta vinculada.
 * **Imagens por `Ctrl+V` ou arrastar:** cole prints direto da área de transferência no criador de laços, arraste arquivos ou selecione do computador.
 * **A cereja do bolo:** clique ou puxe a ponta do laço no canto do card para ver a fita se desfazendo com física fluida e som sutil opcional, movendo para **Desfeitos** com opção de **Reamarrar**.
 * **Atalho flexível no Windows:** escolha entre a **bolinha flutuante minimalista** (arrastável para qualquer canto da tela) ou deixar o ícone monocromático **apenas dentro da barra de ferramentas do Windows**, além do atalho global `Ctrl+Alt+L` e alertas nativos por horário.

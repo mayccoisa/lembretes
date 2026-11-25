@@ -36,6 +36,7 @@ import {
   tauriNotificarLembrete,
   tauriObterModoAtalho,
   tauriReamarrarLaco,
+  tauriRegistrarNotificacaoLocal,
   tauriSalvarImagem,
   type ModoAtalhoWindows,
 } from './tauriBridge';
@@ -270,7 +271,10 @@ export async function verificarNotificacoesPendentes(lacos: Laco[]): Promise<boo
   const agoraMs = Date.now();
   let disparouAlgum = false;
   for (const laco of lacos) {
-    if (lacoEstaVencido(laco, agoraMs) && !laco.notificadoEm) {
+    if (laco.lembrarEm && lacoEstaVencido(laco, agoraMs) && !laco.notificadoEm) {
+      const notificadoEm = new Date(agoraMs).toISOString();
+      const nativo = emAmbienteTauri();
+      if (nativo && !(await tauriRegistrarNotificacaoLocal(laco.id, laco.lembrarEm, notificadoEm))) continue;
       const titulo = laco.titulo || 'Laço esperando por você!';
       const corpo =
         laco.modo === 'checklist'
@@ -281,7 +285,7 @@ export async function verificarNotificacoesPendentes(lacos: Laco[]): Promise<boo
               .join(' · ') || 'Confira os itens anotados no seu laço.'
           : laco.texto.slice(0, 110) || 'Abra seus lembretes para conferir a imagem.';
       await tauriNotificarLembrete(titulo, corpo);
-      await atualizarLaco({ id: laco.id, notificadoEm: new Date(agoraMs).toISOString() });
+      if (!nativo) await atualizarLaco({ id: laco.id, notificadoEm });
       disparouAlgum = true;
     }
   }

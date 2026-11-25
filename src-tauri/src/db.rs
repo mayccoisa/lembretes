@@ -4,6 +4,9 @@ use serde::{Deserialize, Deserializer, Serialize};
 use std::path::Path;
 use uuid::Uuid;
 
+mod sincronizacao;
+pub use sincronizacao::{aplicar_laco_remoto, conta_sincronizada, listar_para_sincronizar, vincular_conta_com_backup};
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ItemChecklist {
@@ -629,6 +632,21 @@ pub fn excluir_laco(conn: &Connection, id: &str) -> Result<(), String> {
     )
     .map_err(|e| format!("Falha ao excluir laco: {e}"))?;
     Ok(())
+}
+
+pub fn registrar_notificacao_local(
+    conn: &Connection,
+    id: &str,
+    lembrar_em: &str,
+    notificado_em: &str,
+) -> Result<bool, String> {
+    let mudou = conn.execute(
+        "UPDATE lacos SET notificado_em = ?1
+         WHERE id = ?2 AND lembrar_em = ?3 AND estado = 'ativo'
+           AND deleted_at IS NULL AND notificado_em IS NULL",
+        params![notificado_em, id, lembrar_em],
+    ).map_err(|e| e.to_string())?;
+    Ok(mudou == 1)
 }
 
 #[cfg(test)]

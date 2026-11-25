@@ -11,6 +11,43 @@ export async function tauriListarLacos(): Promise<Laco[]> {
   return invoke<Laco[]>('listar_lacos');
 }
 
+export async function tauriContaSincronizada(): Promise<string | null> {
+  const { invoke } = await import('@tauri-apps/api/core');
+  return invoke('conta_sincronizada');
+}
+
+export async function tauriVincularConta(uid: string): Promise<void> {
+  const { invoke } = await import('@tauri-apps/api/core');
+  await invoke('vincular_conta', { uid });
+}
+
+export async function tauriVersaoExternaBanco(): Promise<number> {
+  const { invoke } = await import('@tauri-apps/api/core');
+  return invoke('versao_externa_banco');
+}
+
+export async function tauriRegistrarNotificacaoLocal(id: string, lembrarEm: string, notificadoEm: string): Promise<boolean> {
+  const { invoke } = await import('@tauri-apps/api/core');
+  return invoke('registrar_notificacao_local', { id, lembrarEm, notificadoEm });
+}
+
+export async function tauriListarParaSincronizar(uid: string): Promise<Laco[]> {
+  const { invoke } = await import('@tauri-apps/api/core');
+  return invoke('listar_para_sincronizar', { uid });
+}
+
+export async function tauriAplicarLacoRemoto(uid: string, laco: Laco, local?: Laco): Promise<boolean> {
+  const { invoke } = await import('@tauri-apps/api/core');
+  return invoke('aplicar_laco_remoto', {
+    uid, laco, versaoEsperada: local?.syncVersion ?? null, dataEsperada: local?.updatedAt ?? null,
+  });
+}
+
+export async function tauriLerImagemSincronizacao(nome: string): Promise<string> {
+  const { invoke } = await import('@tauri-apps/api/core');
+  return invoke('ler_imagem_sincronizacao', { nome });
+}
+
 export async function tauriCriarLaco(input: NovoLacoInput): Promise<Laco> {
   const { invoke } = await import('@tauri-apps/api/core');
   return invoke<Laco>('criar_laco', { input });

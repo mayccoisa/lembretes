@@ -1,0 +1,14 @@
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+    match /usuarios/{uid}/lembretes/{lembreteId}/imagens/{imagemId} {
+      function contaDona() {
+        return request.auth != null && request.auth.uid == uid;
+      }
+
+      allow get, delete: if contaDona();
+      allow create: if contaDona() && request.resource.size > 0
+        && request.resource.contentType.matches('image/[^;]+');
+    }
+  }
+}
